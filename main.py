@@ -1,8 +1,10 @@
 import os
+import io
 import requests
-from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Query, HTTPException, Response
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from mutagen.mp4 import MP4, MP4Cover
 
 app = FastAPI(title="Pro Music API")
 
@@ -24,6 +26,51 @@ def search(song: str = Query(..., description="Song name")):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Upstream error: {e}")
 
+# NAYA ENDPOINT: Jadu yahan hoga (Thumbnail + Name Tagging)
+@app.get("/api/dl")
+def download_file(url: str, title: str, artist: str, image: str = ""):
+    try:
+        # 1. Audio Download karo
+        r = requests.get(url, timeout=30)
+        r.raise_for_status()
+        audio_io = io.BytesIO(r.content)
+
+        # 2. Metadata (Tags) add karo
+        try:
+            audio = MP4(audio_io)
+            audio["\xa9nam"] = title  # Title Tag
+            audio["\xa9ART"] = artist # Artist Tag
+            
+            # Thumbnail add karo
+            if image:
+                try:
+                    img_res = requests.get(image, timeout=10)
+                    if img_res.status_code == 200:
+                        audio["covr"] = [MP4Cover(img_res.content, imageformat=MP4Cover.FORMAT_JPEG)]
+                except:
+                    pass # Agar image download fail ho jaye toh gaana toh chalna chahiye
+                    
+            audio.save(audio_io)
+            audio_io.seek(0)
+        except Exception as e:
+            print(f"Tagging failed (Raw file bhej rahe hain): {e}")
+            audio_io.seek(0)
+
+        # 3. Clean Filename banao
+        safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
+        safe_artist = "".join([c for c in artist if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
+        filename = f"{safe_title} - {safe_artist}.m4a"
+
+        # 4. File Return karo
+        return Response(
+            content=audio_io.read(),
+            media_type="audio/mp4",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # PRO PLAYER HTML/CSS/JS
 HTML_PAGE = """
 <!DOCTYPE html>
@@ -34,7 +81,7 @@ HTML_PAGE = """
 <title>🎵 Pro Music Player</title>
 <style>
   /* ============================================================
-     THEME VARIABLES (From your file)
+     THEME VARIABLES 
      ============================================================ */
   body.theme-default {
     --bg: #f6f2ed; --surface: #ffffff; --surface-hover: #f6efe9;
@@ -91,13 +138,9 @@ HTML_PAGE = """
     --accent: #8a7aaa; --shadow: 0 6px 28px rgba(0, 0, 0, .6);
   }
 
-  /* ============================================================
-     BASE STYLES
-     ============================================================ */
   *{box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
   body{background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden; transition: background 0.3s, color 0.3s;}
   
-  /* Layout */
   .header{padding:15px 20px; background:var(--surface); display:flex; flex-wrap:wrap; gap:15px; align-items:center; box-shadow:var(--shadow); z-index:10; border-bottom:1px solid var(--border); transition: background 0.3s;}
   .header h1{font-size:1.4rem; color:var(--primary); white-space:nowrap;}
   
@@ -113,14 +156,12 @@ HTML_PAGE = """
   .results-section{flex:2; padding:20px; overflow-y:auto;}
   .sidebar{flex:1; background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; max-width:350px; transition:background 0.3s;}
   
-  /* Tabs for Sidebar (Queue / Favorites) */
   .tabs{display:flex; border-bottom:1px solid var(--border);}
   .tab{flex:1; padding:12px; text-align:center; cursor:pointer; font-weight:bold; color:var(--text-secondary); background:var(--surface-hover); border:none; transition:0.2s;}
   .tab.active{color:var(--primary); border-bottom:3px solid var(--primary); background:var(--surface);}
   .tab-content{flex:1; overflow-y:auto; padding:15px; display:none;}
   .tab-content.active{display:block;}
   
-  /* Song Cards */
   .section-title{font-size:1.1rem; margin-bottom:15px; color:var(--text-secondary); font-weight:bold; display:flex; justify-content:space-between;}
   .song-card{display:flex; align-items:center; gap:12px; padding:10px; border-radius:8px; margin-bottom:10px; background:var(--surface); border:1px solid var(--border); transition:0.2s;}
   .song-card:hover{background:var(--surface-hover); transform:translateY(-1px); box-shadow:0 4px 10px rgba(0,0,0,0.05);}
@@ -129,7 +170,6 @@ HTML_PAGE = """
   .song-title{font-weight:bold; font-size:0.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .song-meta{font-size:0.8rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px;}
   
-  /* Action Buttons */
   .actions{display:flex; gap:5px; align-items:center; flex-wrap:wrap; margin-top:6px;}
   .btn{padding:6px 12px; border-radius:6px; border:none; cursor:pointer; font-size:0.8rem; font-weight:bold; display:flex; align-items:center; gap:4px; transition:0.2s;}
   .btn-play{background:var(--primary); color:#fff;}
@@ -137,10 +177,12 @@ HTML_PAGE = """
   .btn-outline{background:transparent; border:1px solid var(--border); color:var(--text);}
   .btn-outline:hover{background:var(--surface-hover); border-color:var(--text-secondary);}
   .btn-fav{background:none; border:none; font-size:1.2rem; cursor:pointer; padding:5px;}
-  .btn-dl{background:var(--primary-light); color:var(--primary); text-decoration:none; border:1px solid var(--primary); font-size:0.75rem; padding:4px 8px; border-radius:4px;}
-  .btn-dl:hover{background:var(--primary); color:#fff;}
   
-  /* Player Bar */
+  /* Naye Download Buttons */
+  .btn-dl{background:var(--primary-light); color:var(--primary); border:1px solid var(--primary); font-size:0.75rem; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s;}
+  .btn-dl:hover{background:var(--primary); color:#fff;}
+  .btn-dl:disabled{opacity:0.5; cursor:wait;}
+  
   .player-bar{position:fixed; bottom:0; left:0; right:0; height:90px; background:var(--surface); display:flex; align-items:center; justify-content:space-between; padding:0 20px; box-shadow:0 -4px 15px rgba(0,0,0,0.1); border-top:1px solid var(--border); z-index:20; transition:background 0.3s;}
   .now-playing{display:flex; align-items:center; gap:12px; width:30%;}
   .now-playing img{width:55px; height:55px; border-radius:8px; object-fit:cover; box-shadow:var(--shadow);}
@@ -155,7 +197,6 @@ HTML_PAGE = """
   .volume-control{width:20%; display:flex; justify-content:flex-end; align-items:center; gap:10px;}
   .volume-control input{width:80px; accent-color:var(--primary);}
   
-  /* Scrollbar */
   ::-webkit-scrollbar{width:6px;}
   ::-webkit-scrollbar-track{background:var(--bg);}
   ::-webkit-scrollbar-thumb{background:var(--border); border-radius:3px;}
@@ -218,7 +259,6 @@ HTML_PAGE = """
   </div>
 </div>
 
-<!-- Player Bar -->
 <div class="player-bar">
   <div class="now-playing">
     <img id="playerImg" src="https://via.placeholder.com/60?text=🎵" alt="Cover">
@@ -250,11 +290,9 @@ HTML_PAGE = """
   </div>
 </div>
 
-<!-- Hidden Audio Element -->
 <audio id="audioPlayer"></audio>
 
 <script>
-  // --- State Management ---
   let searchResults = [];
   let queue = [];
   let favorites = JSON.parse(localStorage.getItem('musicFavs')) || [];
@@ -262,7 +300,6 @@ HTML_PAGE = """
   let isPlaying = false;
   const audio = document.getElementById('audioPlayer');
 
-  // Init Theme
   const savedTheme = localStorage.getItem('musicTheme') || 'theme-default';
   document.body.className = savedTheme;
   document.getElementById('themePicker').value = savedTheme;
@@ -272,7 +309,6 @@ HTML_PAGE = """
     localStorage.setItem('musicTheme', theme);
   }
 
-  // --- UI Tabs ---
   function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -280,7 +316,6 @@ HTML_PAGE = """
     document.getElementById('content-' + tab).classList.add('active');
   }
 
-  // --- Search ---
   async function doSearch(e) {
     e.preventDefault();
     const query = document.getElementById('q').value.trim();
@@ -315,12 +350,14 @@ HTML_PAGE = """
     const isFav = favorites.some(f => f.id === s.id);
     const favIcon = isFav ? '❤️' : '🤍';
     
-    // Get download links
     const urls = s.download_urls || {};
+    const artistName = s.artists ? s.artists.join(', ') : 'Unknown';
+    
+    // Function banaya hai jo backend ko call karega tagging ke liye
     let dlHtml = '';
-    if(urls['320']) dlHtml += `<a href="${urls['320']}" download class="btn-dl" target="_blank">320k</a>`;
-    if(urls['160']) dlHtml += `<a href="${urls['160']}" download class="btn-dl" target="_blank">160k</a>`;
-    if(urls['96']) dlHtml += `<a href="${urls['96']}" download class="btn-dl" target="_blank">96k</a>`;
+    if(urls['320']) dlHtml += `<button onclick="downloadSong(this, '${urls['320']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')" class="btn-dl">320k</button>`;
+    if(urls['160']) dlHtml += `<button onclick="downloadSong(this, '${urls['160']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')" class="btn-dl">160k</button>`;
+    if(urls['96']) dlHtml += `<button onclick="downloadSong(this, '${urls['96']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')" class="btn-dl">96k</button>`;
 
     let queueBtn = source === 'search' ? `<button class="btn btn-outline" onclick="addToQueue(${index})">+ Queue</button>` : 
                    `<button class="btn btn-outline" style="color:red;border-color:red" onclick="removeFromQueue(${index})">Remove</button>`;
@@ -342,7 +379,27 @@ HTML_PAGE = """
     `;
   }
 
-  // --- Queue ---
+  function sanitizeText(text) {
+    return text.replace(/'/g, "\\\\'").replace(/"/g, '&quot;');
+  }
+
+  // JADU: Download Handler
+  function downloadSong(btn, url, title, artist, image) {
+    const originalText = btn.innerText;
+    btn.innerText = '⌛...';
+    btn.disabled = true;
+    
+    // Naya tab kholo backend proxy ke liye
+    const dlUrl = `/api/dl?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&image=${encodeURIComponent(image)}`;
+    window.location.href = dlUrl; 
+    
+    // 4 second baad button wapas normal kardo
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.disabled = false;
+    }, 4000);
+  }
+
   function renderQueue() {
     const container = document.getElementById('queueList');
     if (queue.length === 0) {
@@ -361,7 +418,6 @@ HTML_PAGE = """
   function removeFromQueue(index) {
     queue.splice(index, 1);
     renderQueue();
-    // If currently playing is removed, play next
     if (queue.length > 0 && !currentSong) playFromQueue(0);
   }
 
@@ -370,14 +426,12 @@ HTML_PAGE = """
     renderQueue();
   }
 
-  // --- Favorites ---
   function renderFavorites() {
     const container = document.getElementById('favList');
     if (favorites.length === 0) {
       container.innerHTML = '<p style="color:var(--text-secondary);text-align:center;margin-top:20px;">No favorites yet</p>';
       return;
     }
-    // Reuse generateSongCard but with 'fav' source
     container.innerHTML = favorites.map((s, i) => `
       <div class="song-card">
         <img src="${s.image || ''}" onerror="this.src='https://via.placeholder.com/60?text=🎵'">
@@ -436,11 +490,9 @@ HTML_PAGE = """
     document.getElementById('playerFavBtn').innerText = isFav ? '❤️' : '🤍';
   }
 
-  // --- Player ---
   function playFromSearch(index) {
     currentSong = searchResults[index];
     playSong(currentSong);
-    // Auto add to queue if not there
     if(!queue.find(q => q.id === currentSong.id)) {
       queue.push(currentSong);
       renderQueue();
@@ -499,7 +551,6 @@ HTML_PAGE = """
     }
   }
 
-  // --- Audio Events ---
   audio.addEventListener('timeupdate', () => {
     const curr = audio.currentTime;
     const dur = audio.duration || 0;
@@ -510,9 +561,7 @@ HTML_PAGE = """
     }
   });
 
-  audio.addEventListener('ended', () => {
-    playNext();
-  });
+  audio.addEventListener('ended', () => { playNext(); });
 
   function seekAudio(e) {
     const bar = e.currentTarget;
@@ -528,7 +577,6 @@ HTML_PAGE = """
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   }
 
-  // Init
   renderQueue();
   renderFavorites();
 </script>
