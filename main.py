@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from mutagen.mp4 import MP4, MP4Cover
 
-app = FastAPI(title="Pro Music API")
+app = FastAPI(title="Apple Music Glass API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,42 +26,35 @@ def search(song: str = Query(..., description="Song name")):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Upstream error: {e}")
 
-# NAYA ENDPOINT: Jadu yahan hoga (Thumbnail + Name Tagging)
 @app.get("/api/dl")
 def download_file(url: str, title: str, artist: str, image: str = ""):
     try:
-        # 1. Audio Download karo
         r = requests.get(url, timeout=30)
         r.raise_for_status()
         audio_io = io.BytesIO(r.content)
 
-        # 2. Metadata (Tags) add karo
         try:
             audio = MP4(audio_io)
-            audio["\xa9nam"] = title  # Title Tag
-            audio["\xa9ART"] = artist # Artist Tag
+            audio["\xa9nam"] = title
+            audio["\xa9ART"] = artist
             
-            # Thumbnail add karo
             if image:
                 try:
                     img_res = requests.get(image, timeout=10)
                     if img_res.status_code == 200:
                         audio["covr"] = [MP4Cover(img_res.content, imageformat=MP4Cover.FORMAT_JPEG)]
-                except:
-                    pass # Agar image download fail ho jaye toh gaana toh chalna chahiye
+                except: pass
                     
             audio.save(audio_io)
             audio_io.seek(0)
         except Exception as e:
-            print(f"Tagging failed (Raw file bhej rahe hain): {e}")
+            print(f"Tagging failed: {e}")
             audio_io.seek(0)
 
-        # 3. Clean Filename banao
         safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
         safe_artist = "".join([c for c in artist if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
         filename = f"{safe_title} - {safe_artist}.m4a"
 
-        # 4. File Return karo
         return Response(
             content=audio_io.read(),
             media_type="audio/mp4",
@@ -70,176 +63,207 @@ def download_file(url: str, title: str, artist: str, image: str = ""):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# PRO PLAYER HTML/CSS/JS
 HTML_PAGE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🎵 Pro Music Player</title>
+<title>Apple Music Glass</title>
 <style>
   /* ============================================================
-     THEME VARIABLES 
+     APPLE MUSIC GLASS THEME
      ============================================================ */
-  body.theme-default {
-    --bg: #f6f2ed; --surface: #ffffff; --surface-hover: #f6efe9;
-    --text: #1e1a17; --text-secondary: #5e5148; --border: #e3dbd3;
-    --primary: #b45309; --primary-hover: #92400e; --primary-light: #fef3e8;
-    --accent: #6b4c3b; --shadow: 0 6px 28px rgba(0, 0, 0, 0.08);
-  }
-  body.theme-rose {
-    --bg: #fdf6f0; --surface: #fff; --surface-hover: #fce8e0;
-    --text: #3d2a1f; --text-secondary: #7a5a4a; --border: #f0d5c8;
-    --primary: #d45c7a; --primary-hover: #b84a66; --primary-light: #fce8e6;
-    --accent: #a67c6b; --shadow: 0 6px 28px rgba(212, 92, 122, .15);
-  }
-  body.theme-ocean {
-    --bg: #f0f7fc; --surface: #fff; --surface-hover: #e4f0fa;
-    --text: #1a2e3f; --text-secondary: #4a6a7f; --border: #c8dce8;
-    --primary: #2a7faa; --primary-hover: #1f648a; --primary-light: #dcecf5;
-    --accent: #4a8fa7; --shadow: 0 6px 28px rgba(42, 127, 170, .15);
-  }
-  body.theme-sunset {
-    --bg: #fef8f0; --surface: #fff; --surface-hover: #fef0e0;
-    --text: #3d2a1a; --text-secondary: #7a5a3a; --border: #f0dcc8;
-    --primary: #e07c2e; --primary-hover: #c46820; --primary-light: #fef0e0;
-    --accent: #b08a60; --shadow: 0 6px 28px rgba(224, 124, 46, .2);
-  }
-  body.theme-forest {
-    --bg: #f2f7f0; --surface: #fff; --surface-hover: #e6f0e0;
-    --text: #1a2e1a; --text-secondary: #4a6a3a; --border: #c8dcc0;
-    --primary: #3a7a4a; --primary-hover: #2e6438; --primary-light: #dcecd0;
-    --accent: #6a8a5a; --shadow: 0 6px 28px rgba(58, 122, 74, .15);
-  }
-  body.theme-midnight {
-    --bg: #121212; --surface: #1e1e1e; --surface-hover: #2a2a2a;
-    --text: #f0ece6; --text-secondary: #b0a89c; --border: #3a3a3a;
-    --primary: #c0846a; --primary-hover: #d49a80; --primary-light: #2a1e18;
-    --accent: #a08070; --shadow: 0 6px 28px rgba(0, 0, 0, .5);
-  }
-  body.theme-blush {
-    --bg: #fef6f9; --surface: #fff; --surface-hover: #fce8f0;
-    --text: #3d2a30; --text-secondary: #7a5a66; --border: #f0d5e0;
-    --primary: #d46a8a; --primary-hover: #b85474; --primary-light: #fce8ee;
-    --accent: #a67a8a; --shadow: 0 6px 28px rgba(212, 106, 138, .18);
-  }
-  body.theme-lavender {
-    --bg: #f8f4ff; --surface: #fff; --surface-hover: #f0e8ff;
-    --text: #2d1f3d; --text-secondary: #6a5a7a; --border: #dcd0ec;
-    --primary: #8a6ab8; --primary-hover: #7454a0; --primary-light: #ece4f8;
-    --accent: #8a7a9a; --shadow: 0 6px 28px rgba(138, 106, 184, .15);
-  }
-  body.theme-starry {
-    --bg: #0f0f1a; --surface: #1a1a2e; --surface-hover: #26263a;
-    --text: #e8e0f0; --text-secondary: #a090b0; --border: #3a2a4a;
-    --primary: #b08ad4; --primary-hover: #c4a0e8; --primary-light: #2a1a3a;
-    --accent: #8a7aaa; --shadow: 0 6px 28px rgba(0, 0, 0, .6);
+  :root {
+    --apple-red: #FA233B;
+    --apple-red-hover: #E32035;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-bg-hover: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --text-main: #FFFFFF;
+    --text-sec: #A1A1A6;
   }
 
-  *{box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
-  body{background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden; transition: background 0.3s, color 0.3s;}
+  *{box-sizing:border-box; margin:0; padding:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;}
   
-  .header{padding:15px 20px; background:var(--surface); display:flex; flex-wrap:wrap; gap:15px; align-items:center; box-shadow:var(--shadow); z-index:10; border-bottom:1px solid var(--border); transition: background 0.3s;}
-  .header h1{font-size:1.4rem; color:var(--primary); white-space:nowrap;}
+  /* Dynamic Animated Background */
+  body {
+    background-color: #000;
+    color: var(--text-main);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    z-index: 0;
+  }
+
+  /* Blurred colorful orbs for the glass effect to shine */
+  .bg-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: -1;
+    opacity: 0.6;
+    animation: float 10s infinite alternate ease-in-out;
+  }
+  .orb-1 { width: 400px; height: 400px; background: #FA233B; top: -100px; left: -100px; }
+  .orb-2 { width: 500px; height: 500px; background: #5E5CE6; bottom: -150px; right: -100px; animation-delay: -5s; }
+  .orb-3 { width: 300px; height: 300px; background: #FF9500; top: 40%; left: 40%; opacity: 0.3; }
+
+  @keyframes float {
+    0% { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(30px, 50px) scale(1.1); }
+  }
+
+  /* Glassmorphism Utility */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  }
+
+  /* Header */
+  .header {
+    margin: 15px; padding: 15px 25px; border-radius: 20px;
+    display: flex; align-items: center; gap: 20px; z-index: 10;
+  }
+  .header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px;}
+  .header h1 span { color: var(--apple-red); }
   
-  .search-box{flex:1; display:flex; gap:10px; min-width:250px;}
-  .search-box input{flex:1; padding:10px 15px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); outline:none; font-size:1rem;}
-  .search-box input:focus{border-color:var(--primary);}
-  .search-box button{padding:10px 20px; border-radius:8px; border:none; background:var(--primary); color:#fff; font-weight:bold; cursor:pointer; transition:0.2s;}
-  .search-box button:hover{background:var(--primary-hover);}
+  .search-box { flex: 1; display: flex; gap: 10px; max-width: 600px; margin-left: auto;}
+  .search-box input {
+    flex: 1; padding: 12px 20px; border-radius: 12px; border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.1); color: white; outline: none; font-size: 1rem;
+    transition: 0.3s;
+  }
+  .search-box input::placeholder { color: var(--text-sec); }
+  .search-box input:focus { background: rgba(255, 255, 255, 0.15); border-color: rgba(255,255,255,0.3); }
+  .search-box button {
+    padding: 12px 25px; border-radius: 12px; border: none; background: var(--apple-red); 
+    color: white; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 1rem;
+  }
+  .search-box button:hover { background: var(--apple-red-hover); transform: scale(1.02); }
+
+  /* Main Layout */
+  .main-content { flex: 1; display: flex; gap: 15px; padding: 0 15px 110px 15px; overflow: hidden; }
   
-  .theme-selector{padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); outline:none; cursor:pointer; font-weight:bold;}
+  .results-section {
+    flex: 2; border-radius: 20px; padding: 20px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px;
+  }
   
-  .main-content{flex:1; display:flex; overflow:hidden; padding-bottom:90px;}
-  .results-section{flex:2; padding:20px; overflow-y:auto;}
-  .sidebar{flex:1; background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; max-width:350px; transition:background 0.3s;}
+  .sidebar {
+    flex: 1; max-width: 380px; border-radius: 20px; display: flex; flex-direction: column;
+  }
+
+  /* Tabs */
+  .tabs { display: flex; padding: 10px; gap: 10px; border-bottom: 1px solid var(--glass-border); }
+  .tab {
+    flex: 1; padding: 10px; border-radius: 10px; text-align: center; cursor: pointer;
+    font-weight: 600; color: var(--text-sec); background: transparent; border: none; transition: 0.3s;
+  }
+  .tab.active { background: rgba(255,255,255,0.1); color: white; }
+  .tab-content { flex: 1; overflow-y: auto; padding: 15px; display: none; }
+  .tab-content.active { display: block; }
+
+  /* Song Cards */
+  .section-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;}
+  .song-card {
+    display: flex; align-items: center; gap: 15px; padding: 12px; border-radius: 16px;
+    background: transparent; transition: 0.2s; border: 1px solid transparent;
+  }
+  .song-card:hover { background: rgba(255,255,255,0.05); border-color: var(--glass-border); }
+  .song-card img { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+  .song-info { flex: 1; min-width: 0; }
+  .song-title { font-weight: 600; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .song-meta { font-size: 0.85rem; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;}
   
-  .tabs{display:flex; border-bottom:1px solid var(--border);}
-  .tab{flex:1; padding:12px; text-align:center; cursor:pointer; font-weight:bold; color:var(--text-secondary); background:var(--surface-hover); border:none; transition:0.2s;}
-  .tab.active{color:var(--primary); border-bottom:3px solid var(--primary); background:var(--surface);}
-  .tab-content{flex:1; overflow-y:auto; padding:15px; display:none;}
-  .tab-content.active{display:block;}
+  /* Buttons */
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .btn {
+    padding: 6px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.85rem;
+    font-weight: 600; display: flex; align-items: center; gap: 6px; transition: 0.2s;
+  }
+  .btn-play { background: white; color: black; }
+  .btn-play:hover { transform: scale(1.05); }
+  .btn-outline { background: rgba(255,255,255,0.1); color: white; border: 1px solid transparent; }
+  .btn-outline:hover { background: rgba(255,255,255,0.2); }
+  .btn-fav { background: none; border: none; font-size: 1.3rem; cursor: pointer; transition: 0.2s; padding: 5px;}
+  .btn-fav:hover { transform: scale(1.2); }
   
-  .section-title{font-size:1.1rem; margin-bottom:15px; color:var(--text-secondary); font-weight:bold; display:flex; justify-content:space-between;}
-  .song-card{display:flex; align-items:center; gap:12px; padding:10px; border-radius:8px; margin-bottom:10px; background:var(--surface); border:1px solid var(--border); transition:0.2s;}
-  .song-card:hover{background:var(--surface-hover); transform:translateY(-1px); box-shadow:0 4px 10px rgba(0,0,0,0.05);}
-  .song-card img{width:55px; height:55px; border-radius:6px; object-fit:cover;}
-  .song-info{flex:1; min-width:0;}
-  .song-title{font-weight:bold; font-size:0.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .song-meta{font-size:0.8rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px;}
+  .btn-dl {
+    background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.2);
+    font-size: 0.75rem; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;
+  }
+  .btn-dl:hover { background: var(--apple-red); border-color: var(--apple-red); }
+  .btn-dl:disabled { opacity: 0.5; cursor: wait; }
+
+  /* Floating Player Bar */
+  .player-bar {
+    position: fixed; bottom: 15px; left: 15px; right: 15px; height: 80px;
+    border-radius: 20px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 25px; z-index: 20;
+  }
   
-  .actions{display:flex; gap:5px; align-items:center; flex-wrap:wrap; margin-top:6px;}
-  .btn{padding:6px 12px; border-radius:6px; border:none; cursor:pointer; font-size:0.8rem; font-weight:bold; display:flex; align-items:center; gap:4px; transition:0.2s;}
-  .btn-play{background:var(--primary); color:#fff;}
-  .btn-play:hover{background:var(--primary-hover);}
-  .btn-outline{background:transparent; border:1px solid var(--border); color:var(--text);}
-  .btn-outline:hover{background:var(--surface-hover); border-color:var(--text-secondary);}
-  .btn-fav{background:none; border:none; font-size:1.2rem; cursor:pointer; padding:5px;}
+  .now-playing { display: flex; align-items: center; gap: 15px; width: 30%; }
+  .now-playing img { width: 55px; height: 55px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
   
-  /* Naye Download Buttons */
-  .btn-dl{background:var(--primary-light); color:var(--primary); border:1px solid var(--primary); font-size:0.75rem; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold; transition:0.2s;}
-  .btn-dl:hover{background:var(--primary); color:#fff;}
-  .btn-dl:disabled{opacity:0.5; cursor:wait;}
+  .player-controls { display: flex; flex-direction: column; align-items: center; flex: 1; }
+  .controls-btns { display: flex; gap: 25px; align-items: center; margin-bottom: 5px; }
+  .controls-btns button { background: none; border: none; color: white; font-size: 1.4rem; cursor: pointer; transition: 0.2s; }
+  .controls-btns button:hover { color: var(--apple-red); transform: scale(1.1); }
+  .controls-btns .play-btn { font-size: 2.2rem; color: white; }
   
-  .player-bar{position:fixed; bottom:0; left:0; right:0; height:90px; background:var(--surface); display:flex; align-items:center; justify-content:space-between; padding:0 20px; box-shadow:0 -4px 15px rgba(0,0,0,0.1); border-top:1px solid var(--border); z-index:20; transition:background 0.3s;}
-  .now-playing{display:flex; align-items:center; gap:12px; width:30%;}
-  .now-playing img{width:55px; height:55px; border-radius:8px; object-fit:cover; box-shadow:var(--shadow);}
-  .player-controls{display:flex; flex-direction:column; align-items:center; flex:1;}
-  .controls-btns{display:flex; gap:15px; align-items:center; margin-bottom:8px;}
-  .controls-btns button{background:none; border:none; color:var(--text); font-size:1.3rem; cursor:pointer; transition:0.2s;}
-  .controls-btns button:hover{color:var(--primary);}
-  .controls-btns .play-btn{font-size:2rem; color:var(--primary);}
-  .progress-container{width:100%; max-width:400px; display:flex; align-items:center; gap:10px; font-size:0.8rem; color:var(--text-secondary);}
-  .progress-bar{flex:1; height:6px; background:var(--border); border-radius:3px; cursor:pointer; position:relative;}
-  .progress-fill{height:100%; background:var(--primary); width:0%; border-radius:3px; transition:0.1s;}
-  .volume-control{width:20%; display:flex; justify-content:flex-end; align-items:center; gap:10px;}
-  .volume-control input{width:80px; accent-color:var(--primary);}
+  .progress-container { width: 100%; max-width: 450px; display: flex; align-items: center; gap: 10px; font-size: 0.75rem; color: var(--text-sec); font-weight: 500;}
+  .progress-bar { flex: 1; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; cursor: pointer; position: relative; overflow: hidden;}
+  .progress-fill { height: 100%; background: white; width: 0%; border-radius: 3px; transition: 0.1s; }
   
-  ::-webkit-scrollbar{width:6px;}
-  ::-webkit-scrollbar-track{background:var(--bg);}
-  ::-webkit-scrollbar-thumb{background:var(--border); border-radius:3px;}
-  ::-webkit-scrollbar-thumb:hover{background:var(--primary);}
-  
+  .volume-control { width: 25%; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+  .volume-control input { width: 100px; accent-color: white; cursor: pointer; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
   @media (max-width: 800px) {
-    .header{flex-direction:column; align-items:stretch;}
-    .main-content{flex-direction:column;}
-    .sidebar{display:none;}
-    .volume-control{display:none;}
-    .now-playing{width:40%;}
-    .player-controls{width:60%;}
+    .header { flex-direction: column; align-items: stretch; padding: 15px; }
+    .search-box { margin-left: 0; }
+    .main-content { flex-direction: column; padding: 0 10px 100px 10px; }
+    .sidebar { display: none; }
+    .volume-control { display: none; }
+    .now-playing { width: 40%; }
+    .player-controls { width: 60%; }
+    .player-bar { padding: 0 15px; bottom: 10px; left: 10px; right: 10px; }
   }
 </style>
 </head>
-<body class="theme-default">
+<body>
 
-<div class="header">
-  <h1>🎵 Pro Music</h1>
+<!-- Background Orbs for Glass Effect -->
+<div class="bg-orb orb-1"></div>
+<div class="bg-orb orb-2"></div>
+<div class="bg-orb orb-3"></div>
+
+<div class="header glass">
+  <h1><span></span> Music Glass</h1>
   <form class="search-box" onsubmit="doSearch(event)">
     <input id="q" placeholder="Search songs (e.g. Saree Se Tadi)..." autofocus>
     <button type="submit" id="searchBtn">Search</button>
   </form>
-  <select class="theme-selector" id="themePicker" onchange="changeTheme(this.value)">
-    <option value="theme-default">Default</option>
-    <option value="theme-rose">Rose</option>
-    <option value="theme-ocean">Ocean</option>
-    <option value="theme-sunset">Sunset</option>
-    <option value="theme-forest">Forest</option>
-    <option value="theme-midnight">Midnight</option>
-    <option value="theme-blush">Blush</option>
-    <option value="theme-lavender">Lavender</option>
-    <option value="theme-starry">Starry</option>
-  </select>
 </div>
 
 <div class="main-content">
-  <div class="results-section">
+  <div class="results-section glass">
     <div class="section-title" id="resultsTitle">Search Results</div>
     <div id="results"></div>
   </div>
   
-  <div class="sidebar">
+  <div class="sidebar glass">
     <div class="tabs">
       <button class="tab active" onclick="switchTab('queue')" id="tab-queue">Up Next</button>
       <button class="tab" onclick="switchTab('fav')" id="tab-fav">Favorites ❤️</button>
@@ -259,9 +283,9 @@ HTML_PAGE = """
   </div>
 </div>
 
-<div class="player-bar">
+<div class="player-bar glass">
   <div class="now-playing">
-    <img id="playerImg" src="https://via.placeholder.com/60?text=🎵" alt="Cover">
+    <img id="playerImg" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><rect width='60' height='60' fill='%23333'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='24' fill='%23888'>🎵</text></svg>" alt="Cover">
     <div class="song-info">
       <div class="song-title" id="playerTitle">Select a song</div>
       <div class="song-meta" id="playerArtist">-</div>
@@ -300,15 +324,6 @@ HTML_PAGE = """
   let isPlaying = false;
   const audio = document.getElementById('audioPlayer');
 
-  const savedTheme = localStorage.getItem('musicTheme') || 'theme-default';
-  document.body.className = savedTheme;
-  document.getElementById('themePicker').value = savedTheme;
-
-  function changeTheme(theme) {
-    document.body.className = theme;
-    localStorage.setItem('musicTheme', theme);
-  }
-
   function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -335,7 +350,7 @@ HTML_PAGE = """
       renderResults();
     } catch (err) {
       document.getElementById('resultsTitle').innerText = 'Error!';
-      document.getElementById('results').innerHTML = `<p style="color:red">${err.message}</p>`;
+      document.getElementById('results').innerHTML = `<p style="color:var(--apple-red)">${err.message}</p>`;
     } finally {
       document.getElementById('searchBtn').disabled = false;
     }
@@ -353,18 +368,17 @@ HTML_PAGE = """
     const urls = s.download_urls || {};
     const artistName = s.artists ? s.artists.join(', ') : 'Unknown';
     
-    // Function banaya hai jo backend ko call karega tagging ke liye
     let dlHtml = '';
     if(urls['320']) dlHtml += `<button onclick="downloadSong(this, '${urls['320']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')" class="btn-dl">320k</button>`;
     if(urls['160']) dlHtml += `<button onclick="downloadSong(this, '${urls['160']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')" class="btn-dl">160k</button>`;
     if(urls['96']) dlHtml += `<button onclick="downloadSong(this, '${urls['96']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')" class="btn-dl">96k</button>`;
 
     let queueBtn = source === 'search' ? `<button class="btn btn-outline" onclick="addToQueue(${index})">+ Queue</button>` : 
-                   `<button class="btn btn-outline" style="color:red;border-color:red" onclick="removeFromQueue(${index})">Remove</button>`;
+                   `<button class="btn btn-outline" style="color:var(--apple-red)" onclick="removeFromQueue(${index})">Remove</button>`;
 
     return `
       <div class="song-card">
-        <img src="${s.image || ''}" onerror="this.src='https://via.placeholder.com/60?text=🎵'">
+        <img src="${s.image || ''}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'60\\' height=\\'60\\'><rect width=\\'60\\' height=\\'60\\' fill=\\'%23333\\'/></svg>'">
         <div class="song-info">
           <div class="song-title">${s.title}</div>
           <div class="song-meta">${s.subtitle || ''}</div>
@@ -383,17 +397,14 @@ HTML_PAGE = """
     return text.replace(/'/g, "\\\\'").replace(/"/g, '&quot;');
   }
 
-  // JADU: Download Handler
   function downloadSong(btn, url, title, artist, image) {
     const originalText = btn.innerText;
     btn.innerText = '⌛...';
     btn.disabled = true;
     
-    // Naya tab kholo backend proxy ke liye
     const dlUrl = `/api/dl?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&image=${encodeURIComponent(image)}`;
     window.location.href = dlUrl; 
     
-    // 4 second baad button wapas normal kardo
     setTimeout(() => {
       btn.innerText = originalText;
       btn.disabled = false;
@@ -403,7 +414,7 @@ HTML_PAGE = """
   function renderQueue() {
     const container = document.getElementById('queueList');
     if (queue.length === 0) {
-      container.innerHTML = '<p style="color:var(--text-secondary);text-align:center;margin-top:20px;">Queue is empty</p>';
+      container.innerHTML = '<p style="color:var(--text-sec);text-align:center;margin-top:20px;">Queue is empty</p>';
       return;
     }
     container.innerHTML = queue.map((s, i) => generateSongCard(s, i, 'queue')).join('');
@@ -429,12 +440,12 @@ HTML_PAGE = """
   function renderFavorites() {
     const container = document.getElementById('favList');
     if (favorites.length === 0) {
-      container.innerHTML = '<p style="color:var(--text-secondary);text-align:center;margin-top:20px;">No favorites yet</p>';
+      container.innerHTML = '<p style="color:var(--text-sec);text-align:center;margin-top:20px;">No favorites yet</p>';
       return;
     }
     container.innerHTML = favorites.map((s, i) => `
       <div class="song-card">
-        <img src="${s.image || ''}" onerror="this.src='https://via.placeholder.com/60?text=🎵'">
+        <img src="${s.image || ''}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'60\\' height=\\'60\\'><rect width=\\'60\\' height=\\'60\\' fill=\\'%23333\\'/></svg>'">
         <div class="song-info">
           <div class="song-title">${s.title}</div>
           <div class="song-meta">${s.subtitle || ''}</div>
