@@ -33,85 +33,163 @@ HTML_PAGE = """
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎵 Pro Music Player</title>
 <style>
-  :root {
-    --bg: #0f172a; --surface: #1e293b; --primary: #6366f1; --primary-hover: #4f46e5;
-    --text: #f8fafc; --text-muted: #94a3b8; --danger: #ef4444;
+  /* ============================================================
+     THEME VARIABLES (From your file)
+     ============================================================ */
+  body.theme-default {
+    --bg: #f6f2ed; --surface: #ffffff; --surface-hover: #f6efe9;
+    --text: #1e1a17; --text-secondary: #5e5148; --border: #e3dbd3;
+    --primary: #b45309; --primary-hover: #92400e; --primary-light: #fef3e8;
+    --accent: #6b4c3b; --shadow: 0 6px 28px rgba(0, 0, 0, 0.08);
   }
+  body.theme-rose {
+    --bg: #fdf6f0; --surface: #fff; --surface-hover: #fce8e0;
+    --text: #3d2a1f; --text-secondary: #7a5a4a; --border: #f0d5c8;
+    --primary: #d45c7a; --primary-hover: #b84a66; --primary-light: #fce8e6;
+    --accent: #a67c6b; --shadow: 0 6px 28px rgba(212, 92, 122, .15);
+  }
+  body.theme-ocean {
+    --bg: #f0f7fc; --surface: #fff; --surface-hover: #e4f0fa;
+    --text: #1a2e3f; --text-secondary: #4a6a7f; --border: #c8dce8;
+    --primary: #2a7faa; --primary-hover: #1f648a; --primary-light: #dcecf5;
+    --accent: #4a8fa7; --shadow: 0 6px 28px rgba(42, 127, 170, .15);
+  }
+  body.theme-sunset {
+    --bg: #fef8f0; --surface: #fff; --surface-hover: #fef0e0;
+    --text: #3d2a1a; --text-secondary: #7a5a3a; --border: #f0dcc8;
+    --primary: #e07c2e; --primary-hover: #c46820; --primary-light: #fef0e0;
+    --accent: #b08a60; --shadow: 0 6px 28px rgba(224, 124, 46, .2);
+  }
+  body.theme-forest {
+    --bg: #f2f7f0; --surface: #fff; --surface-hover: #e6f0e0;
+    --text: #1a2e1a; --text-secondary: #4a6a3a; --border: #c8dcc0;
+    --primary: #3a7a4a; --primary-hover: #2e6438; --primary-light: #dcecd0;
+    --accent: #6a8a5a; --shadow: 0 6px 28px rgba(58, 122, 74, .15);
+  }
+  body.theme-midnight {
+    --bg: #121212; --surface: #1e1e1e; --surface-hover: #2a2a2a;
+    --text: #f0ece6; --text-secondary: #b0a89c; --border: #3a3a3a;
+    --primary: #c0846a; --primary-hover: #d49a80; --primary-light: #2a1e18;
+    --accent: #a08070; --shadow: 0 6px 28px rgba(0, 0, 0, .5);
+  }
+  body.theme-blush {
+    --bg: #fef6f9; --surface: #fff; --surface-hover: #fce8f0;
+    --text: #3d2a30; --text-secondary: #7a5a66; --border: #f0d5e0;
+    --primary: #d46a8a; --primary-hover: #b85474; --primary-light: #fce8ee;
+    --accent: #a67a8a; --shadow: 0 6px 28px rgba(212, 106, 138, .18);
+  }
+  body.theme-lavender {
+    --bg: #f8f4ff; --surface: #fff; --surface-hover: #f0e8ff;
+    --text: #2d1f3d; --text-secondary: #6a5a7a; --border: #dcd0ec;
+    --primary: #8a6ab8; --primary-hover: #7454a0; --primary-light: #ece4f8;
+    --accent: #8a7a9a; --shadow: 0 6px 28px rgba(138, 106, 184, .15);
+  }
+  body.theme-starry {
+    --bg: #0f0f1a; --surface: #1a1a2e; --surface-hover: #26263a;
+    --text: #e8e0f0; --text-secondary: #a090b0; --border: #3a2a4a;
+    --primary: #b08ad4; --primary-hover: #c4a0e8; --primary-light: #2a1a3a;
+    --accent: #8a7aaa; --shadow: 0 6px 28px rgba(0, 0, 0, .6);
+  }
+
+  /* ============================================================
+     BASE STYLES
+     ============================================================ */
   *{box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;}
-  body{background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden;}
+  body{background:var(--bg); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden; transition: background 0.3s, color 0.3s;}
   
   /* Layout */
-  .header{padding:15px 30px; background:var(--surface); display:flex; gap:20px; align-items:center; box-shadow:0 4px 6px rgba(0,0,0,0.3); z-index:10;}
-  .header h1{font-size:1.5rem; color:var(--primary); white-space:nowrap;}
-  .search-box{flex:1; display:flex; gap:10px; max-width:600px;}
-  .search-box input{flex:1; padding:12px; border-radius:8px; border:1px solid #334155; background:var(--bg); color:white; outline:none;}
+  .header{padding:15px 20px; background:var(--surface); display:flex; flex-wrap:wrap; gap:15px; align-items:center; box-shadow:var(--shadow); z-index:10; border-bottom:1px solid var(--border); transition: background 0.3s;}
+  .header h1{font-size:1.4rem; color:var(--primary); white-space:nowrap;}
+  
+  .search-box{flex:1; display:flex; gap:10px; min-width:250px;}
+  .search-box input{flex:1; padding:10px 15px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); outline:none; font-size:1rem;}
   .search-box input:focus{border-color:var(--primary);}
-  .search-box button{padding:12px 24px; border-radius:8px; border:none; background:var(--primary); color:white; font-weight:bold; cursor:pointer; transition:0.2s;}
+  .search-box button{padding:10px 20px; border-radius:8px; border:none; background:var(--primary); color:#fff; font-weight:bold; cursor:pointer; transition:0.2s;}
   .search-box button:hover{background:var(--primary-hover);}
+  
+  .theme-selector{padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); outline:none; cursor:pointer; font-weight:bold;}
   
   .main-content{flex:1; display:flex; overflow:hidden; padding-bottom:90px;}
   .results-section{flex:2; padding:20px; overflow-y:auto;}
-  .queue-section{flex:1; padding:20px; background:var(--surface); border-left:1px solid #334155; display:flex; flex-direction:column;}
+  .sidebar{flex:1; background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; max-width:350px; transition:background 0.3s;}
   
-  /* Lists */
-  .section-title{font-size:1.2rem; margin-bottom:15px; color:var(--text-muted); border-bottom:1px solid #334155; padding-bottom:10px;}
-  .song-card{display:flex; align-items:center; gap:15px; padding:10px; border-radius:8px; margin-bottom:10px; background:rgba(255,255,255,0.03); transition:0.2s;}
-  .song-card:hover{background:rgba(255,255,255,0.08);}
-  .song-card img{width:60px; height:60px; border-radius:6px; object-fit:cover;}
+  /* Tabs for Sidebar (Queue / Favorites) */
+  .tabs{display:flex; border-bottom:1px solid var(--border);}
+  .tab{flex:1; padding:12px; text-align:center; cursor:pointer; font-weight:bold; color:var(--text-secondary); background:var(--surface-hover); border:none; transition:0.2s;}
+  .tab.active{color:var(--primary); border-bottom:3px solid var(--primary); background:var(--surface);}
+  .tab-content{flex:1; overflow-y:auto; padding:15px; display:none;}
+  .tab-content.active{display:block;}
+  
+  /* Song Cards */
+  .section-title{font-size:1.1rem; margin-bottom:15px; color:var(--text-secondary); font-weight:bold; display:flex; justify-content:space-between;}
+  .song-card{display:flex; align-items:center; gap:12px; padding:10px; border-radius:8px; margin-bottom:10px; background:var(--surface); border:1px solid var(--border); transition:0.2s;}
+  .song-card:hover{background:var(--surface-hover); transform:translateY(-1px); box-shadow:0 4px 10px rgba(0,0,0,0.05);}
+  .song-card img{width:55px; height:55px; border-radius:6px; object-fit:cover;}
   .song-info{flex:1; min-width:0;}
-  .song-title{font-weight:bold; font-size:1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .song-meta{font-size:0.85rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .btn-icon{background:var(--primary); border:none; color:white; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:1.2rem; transition:0.2s;}
-  .btn-icon:hover{background:var(--primary-hover); transform:scale(1.05);}
-  .btn-queue{background:transparent; border:1px solid var(--text-muted); color:var(--text-muted);}
-  .btn-queue:hover{background:var(--text-muted); color:var(--bg);}
+  .song-title{font-weight:bold; font-size:0.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .song-meta{font-size:0.8rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px;}
+  
+  /* Action Buttons */
+  .actions{display:flex; gap:5px; align-items:center; flex-wrap:wrap; margin-top:6px;}
+  .btn{padding:6px 12px; border-radius:6px; border:none; cursor:pointer; font-size:0.8rem; font-weight:bold; display:flex; align-items:center; gap:4px; transition:0.2s;}
+  .btn-play{background:var(--primary); color:#fff;}
+  .btn-play:hover{background:var(--primary-hover);}
+  .btn-outline{background:transparent; border:1px solid var(--border); color:var(--text);}
+  .btn-outline:hover{background:var(--surface-hover); border-color:var(--text-secondary);}
+  .btn-fav{background:none; border:none; font-size:1.2rem; cursor:pointer; padding:5px;}
+  .btn-dl{background:var(--primary-light); color:var(--primary); text-decoration:none; border:1px solid var(--primary); font-size:0.75rem; padding:4px 8px; border-radius:4px;}
+  .btn-dl:hover{background:var(--primary); color:#fff;}
   
   /* Player Bar */
-  .player-bar{position:fixed; bottom:0; left:0; right:0; height:90px; background:var(--surface); display:flex; align-items:center; justify-content:space-between; padding:0 30px; box-shadow:0 -4px 10px rgba(0,0,0,0.5); border-top:1px solid #334155;}
-  .now-playing{display:flex; align-items:center; gap:15px; width:30%;}
-  .now-playing img{width:60px; height:60px; border-radius:8px; object-fit:cover; box-shadow:0 4px 8px rgba(0,0,0,0.3);}
+  .player-bar{position:fixed; bottom:0; left:0; right:0; height:90px; background:var(--surface); display:flex; align-items:center; justify-content:space-between; padding:0 20px; box-shadow:0 -4px 15px rgba(0,0,0,0.1); border-top:1px solid var(--border); z-index:20; transition:background 0.3s;}
+  .now-playing{display:flex; align-items:center; gap:12px; width:30%;}
+  .now-playing img{width:55px; height:55px; border-radius:8px; object-fit:cover; box-shadow:var(--shadow);}
   .player-controls{display:flex; flex-direction:column; align-items:center; flex:1;}
-  .controls-btns{display:flex; gap:20px; align-items:center; margin-bottom:10px;}
-  .controls-btns button{background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;}
-  .controls-btns .play-btn{font-size:2.2rem; color:var(--primary);}
-  .progress-container{width:50%; display:flex; align-items:center; gap:10px; font-size:0.8rem; color:var(--text-muted);}
-  .progress-bar{flex:1; height:5px; background:#334155; border-radius:3px; cursor:pointer; position:relative;}
+  .controls-btns{display:flex; gap:15px; align-items:center; margin-bottom:8px;}
+  .controls-btns button{background:none; border:none; color:var(--text); font-size:1.3rem; cursor:pointer; transition:0.2s;}
+  .controls-btns button:hover{color:var(--primary);}
+  .controls-btns .play-btn{font-size:2rem; color:var(--primary);}
+  .progress-container{width:100%; max-width:400px; display:flex; align-items:center; gap:10px; font-size:0.8rem; color:var(--text-secondary);}
+  .progress-bar{flex:1; height:6px; background:var(--border); border-radius:3px; cursor:pointer; position:relative;}
   .progress-fill{height:100%; background:var(--primary); width:0%; border-radius:3px; transition:0.1s;}
   .volume-control{width:20%; display:flex; justify-content:flex-end; align-items:center; gap:10px;}
-  .volume-control input{width:100px; accent-color:var(--primary);}
-  
-  /* Equalizer Modal */
-  .eq-modal{display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--surface); padding:30px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.8); z-index:100; border:1px solid #334155;}
-  .eq-modal.active{display:flex; gap:20px; flex-direction:column; align-items:center;}
-  .eq-bands{display:flex; gap:20px; height:150px; align-items:flex-end;}
-  .eq-band{display:flex; flex-direction:column; align-items:center; gap:10px;}
-  .eq-band input[type=range]{writing-mode:bt-lr; -webkit-appearance:slider-vertical; width:10px; height:120px; background:#334155; outline:none; border-radius:5px;}
-  .eq-close{position:absolute; top:10px; right:15px; background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;}
+  .volume-control input{width:80px; accent-color:var(--primary);}
   
   /* Scrollbar */
-  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar{width:6px;}
   ::-webkit-scrollbar-track{background:var(--bg);}
-  ::-webkit-scrollbar-thumb{background:#475569; border-radius:4px;}
+  ::-webkit-scrollbar-thumb{background:var(--border); border-radius:3px;}
   ::-webkit-scrollbar-thumb:hover{background:var(--primary);}
   
-  @media (max-width: 768px) {
+  @media (max-width: 800px) {
+    .header{flex-direction:column; align-items:stretch;}
     .main-content{flex-direction:column;}
-    .queue-section{display:none;}
+    .sidebar{display:none;}
     .volume-control{display:none;}
     .now-playing{width:40%;}
-    .player-bar{padding:0 15px;}
+    .player-controls{width:60%;}
   }
 </style>
 </head>
-<body>
+<body class="theme-default">
 
 <div class="header">
   <h1>🎵 Pro Music</h1>
   <form class="search-box" onsubmit="doSearch(event)">
-    <input id="q" placeholder="Search songs..." autofocus>
+    <input id="q" placeholder="Search songs (e.g. Saree Se Tadi)..." autofocus>
     <button type="submit" id="searchBtn">Search</button>
   </form>
-  <button class="btn-icon" onclick="toggleEQ()" title="Equalizer">🎛️ EQ</button>
+  <select class="theme-selector" id="themePicker" onchange="changeTheme(this.value)">
+    <option value="theme-default">Default</option>
+    <option value="theme-rose">Rose</option>
+    <option value="theme-ocean">Ocean</option>
+    <option value="theme-sunset">Sunset</option>
+    <option value="theme-forest">Forest</option>
+    <option value="theme-midnight">Midnight</option>
+    <option value="theme-blush">Blush</option>
+    <option value="theme-lavender">Lavender</option>
+    <option value="theme-starry">Starry</option>
+  </select>
 </div>
 
 <div class="main-content">
@@ -119,23 +197,36 @@ HTML_PAGE = """
     <div class="section-title" id="resultsTitle">Search Results</div>
     <div id="results"></div>
   </div>
-  <div class="queue-section">
-    <div class="section-title" style="display:flex; justify-content:space-between;">
-      <span>Up Next (Queue)</span>
-      <button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.8rem;" onclick="clearQueue()">Clear</button>
+  
+  <div class="sidebar">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('queue')" id="tab-queue">Up Next</button>
+      <button class="tab" onclick="switchTab('fav')" id="tab-fav">Favorites ❤️</button>
     </div>
-    <div id="queueList" style="flex:1; overflow-y:auto;"></div>
+    
+    <div class="tab-content active" id="content-queue">
+      <div class="section-title">
+        Queue <button class="btn btn-outline" onclick="clearQueue()">Clear</button>
+      </div>
+      <div id="queueList"></div>
+    </div>
+    
+    <div class="tab-content" id="content-fav">
+      <div class="section-title">My Favorites</div>
+      <div id="favList"></div>
+    </div>
   </div>
 </div>
 
 <!-- Player Bar -->
 <div class="player-bar">
   <div class="now-playing">
-    <img id="playerImg" src="https://via.placeholder.com/60?text=Music" alt="Cover">
+    <img id="playerImg" src="https://via.placeholder.com/60?text=🎵" alt="Cover">
     <div class="song-info">
       <div class="song-title" id="playerTitle">Select a song</div>
       <div class="song-meta" id="playerArtist">-</div>
     </div>
+    <button class="btn-fav" id="playerFavBtn" onclick="toggleFavCurrent()">🤍</button>
   </div>
   
   <div class="player-controls">
@@ -159,21 +250,6 @@ HTML_PAGE = """
   </div>
 </div>
 
-<!-- Equalizer Modal -->
-<div class="eq-modal" id="eqModal">
-  <button class="eq-close" onclick="toggleEQ()">×</button>
-  <h3>5-Band Equalizer</h3>
-  <p style="font-size:0.8rem;color:#94a3b8;text-align:center;">*If audio stops, disable EQ due to CORS limits.</p>
-  <div class="eq-bands">
-    <div class="eq-band"><input type="range" id="eq60" min="-15" max="15" value="0" oninput="updateEQ(0, this.value)"><span>60Hz</span></div>
-    <div class="eq-band"><input type="range" id="eq230" min="-15" max="15" value="0" oninput="updateEQ(1, this.value)"><span>230Hz</span></div>
-    <div class="eq-band"><input type="range" id="eq910" min="-15" max="15" value="0" oninput="updateEQ(2, this.value)"><span>910Hz</span></div>
-    <div class="eq-band"><input type="range" id="eq3k" min="-15" max="15" value="0" oninput="updateEQ(3, this.value)"><span>3kHz</span></div>
-    <div class="eq-band"><input type="range" id="eq14k" min="-15" max="15" value="0" oninput="updateEQ(4, this.value)"><span>14kHz</span></div>
-  </div>
-  <button style="background:var(--primary);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;" onclick="resetEQ()">Reset EQ</button>
-</div>
-
 <!-- Hidden Audio Element -->
 <audio id="audioPlayer"></audio>
 
@@ -181,61 +257,30 @@ HTML_PAGE = """
   // --- State Management ---
   let searchResults = [];
   let queue = [];
-  let currentIndex = -1;
+  let favorites = JSON.parse(localStorage.getItem('musicFavs')) || [];
+  let currentSong = null;
   let isPlaying = false;
   const audio = document.getElementById('audioPlayer');
 
-  // --- Web Audio API (Equalizer) ---
-  let audioCtx, source, filters = [];
-  const eqFrequencies = [60, 230, 910, 3000, 14000];
-  let isEQEnabled = false;
+  // Init Theme
+  const savedTheme = localStorage.getItem('musicTheme') || 'theme-default';
+  document.body.className = savedTheme;
+  document.getElementById('themePicker').value = savedTheme;
 
-  function initEQ() {
-    if (audioCtx) return;
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioContext();
-      source = audioCtx.createMediaElementSource(audio);
-      
-      let prevNode = source;
-      eqFrequencies.forEach(freq => {
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'peaking';
-        filter.frequency.value = freq;
-        filter.Q.value = 1;
-        filter.gain.value = 0;
-        prevNode.connect(filter);
-        prevNode = filter;
-        filters.push(filter);
-      });
-      prevNode.connect(audioCtx.destination);
-    } catch(e) {
-      console.log("EQ Error: CORS might block Web Audio API");
-    }
+  function changeTheme(theme) {
+    document.body.className = theme;
+    localStorage.setItem('musicTheme', theme);
   }
 
-  function toggleEQ() {
-    document.getElementById('eqModal').classList.toggle('active');
-    if (!isEQEnabled) {
-      initEQ();
-      isEQEnabled = true;
-      if (audioCtx) audioCtx.resume();
-    }
+  // --- UI Tabs ---
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('content-' + tab).classList.add('active');
   }
 
-  function updateEQ(index, value) {
-    if (filters[index]) filters[index].gain.value = parseFloat(value);
-  }
-
-  function resetEQ() {
-    const ids = ['eq60', 'eq230', 'eq910', 'eq3k', 'eq14k'];
-    ids.forEach((id, i) => {
-      document.getElementById(id).value = 0;
-      updateEQ(i, 0);
-    });
-  }
-
-  // --- Search Functionality ---
+  // --- Search ---
   async function doSearch(e) {
     e.preventDefault();
     const query = document.getElementById('q').value.trim();
@@ -248,123 +293,182 @@ HTML_PAGE = """
     try {
       const res = await fetch('/api/search?song=' + encodeURIComponent(query));
       const data = await res.json();
-      
       if (!res.ok) throw new Error(data.detail || 'Error');
       
       searchResults = data.results || [];
       document.getElementById('resultsTitle').innerText = `Results (${data.total || searchResults.length})`;
-      renderResults(searchResults);
+      renderResults();
     } catch (err) {
       document.getElementById('resultsTitle').innerText = 'Error!';
-      document.getElementById('results').innerHTML = `<p style="color:var(--danger)">${err.message}</p>`;
+      document.getElementById('results').innerHTML = `<p style="color:red">${err.message}</p>`;
     } finally {
       document.getElementById('searchBtn').disabled = false;
     }
   }
 
-  function renderResults(songs) {
+  function renderResults() {
     const container = document.getElementById('results');
-    container.innerHTML = songs.map((s, i) => `
+    container.innerHTML = searchResults.map((s, i) => generateSongCard(s, i, 'search')).join('');
+  }
+
+  function generateSongCard(s, index, source) {
+    const isFav = favorites.some(f => f.id === s.id);
+    const favIcon = isFav ? '❤️' : '🤍';
+    
+    // Get download links
+    const urls = s.download_urls || {};
+    let dlHtml = '';
+    if(urls['320']) dlHtml += `<a href="${urls['320']}" download class="btn-dl" target="_blank">320k</a>`;
+    if(urls['160']) dlHtml += `<a href="${urls['160']}" download class="btn-dl" target="_blank">160k</a>`;
+    if(urls['96']) dlHtml += `<a href="${urls['96']}" download class="btn-dl" target="_blank">96k</a>`;
+
+    let queueBtn = source === 'search' ? `<button class="btn btn-outline" onclick="addToQueue(${index})">+ Queue</button>` : 
+                   `<button class="btn btn-outline" style="color:red;border-color:red" onclick="removeFromQueue(${index})">Remove</button>`;
+
+    return `
       <div class="song-card">
-        <img src="${s.image || ''}" onerror="this.style.display='none'">
+        <img src="${s.image || ''}" onerror="this.src='https://via.placeholder.com/60?text=🎵'">
         <div class="song-info">
           <div class="song-title">${s.title}</div>
           <div class="song-meta">${s.subtitle || ''}</div>
+          <div class="actions">
+            <button class="btn btn-play" onclick="${source === 'search' ? `playFromSearch(${index})` : `playFromQueue(${index})`}">▶ Play</button>
+            ${queueBtn}
+            ${dlHtml}
+          </div>
         </div>
-        <button class="btn-icon" onclick="playFromSearch(${i})">▶</button>
-        <button class="btn-icon btn-queue" onclick="addToQueue(${i})">+ Queue</button>
+        <button class="btn-fav" onclick="toggleFav(${index}, '${source}')">${favIcon}</button>
       </div>
-    `).join('');
+    `;
   }
 
-  // --- Queue Management ---
+  // --- Queue ---
   function renderQueue() {
     const container = document.getElementById('queueList');
     if (queue.length === 0) {
-      container.innerHTML = '<p style="color:var(--text-muted);font-size:0.9rem;text-align:center;margin-top:20px;">Queue is empty</p>';
+      container.innerHTML = '<p style="color:var(--text-secondary);text-align:center;margin-top:20px;">Queue is empty</p>';
       return;
     }
-    container.innerHTML = queue.map((s, i) => `
-      <div class="song-card" style="${i === currentIndex ? 'border:1px solid var(--primary)' : ''}">
-        <img src="${s.image || ''}" style="width:40px;height:40px;">
-        <div class="song-info">
-          <div class="song-title" style="font-size:0.9rem;">${s.title}</div>
-        </div>
-        <button class="btn-icon" style="font-size:0.8rem;padding:4px 8px;background:var(--danger)" onclick="removeFromQueue(${i})">×</button>
-      </div>
-    `).join('');
+    container.innerHTML = queue.map((s, i) => generateSongCard(s, i, 'queue')).join('');
   }
 
   function addToQueue(index) {
     queue.push(searchResults[index]);
     renderQueue();
-    if (currentIndex === -1) {
-      // Auto-start if nothing is playing
-      currentIndex = 0;
-      playSong(queue[0]);
-    }
+    if (!currentSong) playFromQueue(0);
   }
 
   function removeFromQueue(index) {
     queue.splice(index, 1);
-    if (index === currentIndex) {
-      currentIndex = Math.min(currentIndex, queue.length - 1);
-      if (queue.length > 0) playSong(queue[currentIndex]);
-      else stopPlayer();
-    } else if (index < currentIndex) {
-      currentIndex--;
-    }
     renderQueue();
+    // If currently playing is removed, play next
+    if (queue.length > 0 && !currentSong) playFromQueue(0);
   }
 
   function clearQueue() {
     queue = [];
-    currentIndex = -1;
     renderQueue();
-    stopPlayer();
   }
 
-  // --- Player Controls ---
-  function playFromSearch(index) {
-    const song = searchResults[index];
-    // Add all search results below this to queue if queue is empty
-    if (queue.length === 0) {
-      queue = searchResults.slice(index);
-      currentIndex = 0;
-    } else {
-      queue.push(song);
-      currentIndex = queue.length - 1;
+  // --- Favorites ---
+  function renderFavorites() {
+    const container = document.getElementById('favList');
+    if (favorites.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-secondary);text-align:center;margin-top:20px;">No favorites yet</p>';
+      return;
     }
+    // Reuse generateSongCard but with 'fav' source
+    container.innerHTML = favorites.map((s, i) => `
+      <div class="song-card">
+        <img src="${s.image || ''}" onerror="this.src='https://via.placeholder.com/60?text=🎵'">
+        <div class="song-info">
+          <div class="song-title">${s.title}</div>
+          <div class="song-meta">${s.subtitle || ''}</div>
+          <div class="actions">
+            <button class="btn btn-play" onclick="playFav(${i})">▶ Play</button>
+          </div>
+        </div>
+        <button class="btn-fav" onclick="removeFav(${i})">❤️</button>
+      </div>
+    `).join('');
+  }
+
+  function toggleFav(index, source) {
+    let song = source === 'search' ? searchResults[index] : queue[index];
+    const exists = favorites.findIndex(f => f.id === song.id);
+    if (exists > -1) {
+      favorites.splice(exists, 1);
+    } else {
+      favorites.push(song);
+    }
+    localStorage.setItem('musicFavs', JSON.stringify(favorites));
+    renderResults();
     renderQueue();
-    playSong(song);
+    renderFavorites();
+    updatePlayerFavIcon();
+  }
+
+  function toggleFavCurrent() {
+    if(!currentSong) return;
+    const exists = favorites.findIndex(f => f.id === currentSong.id);
+    if (exists > -1) favorites.splice(exists, 1);
+    else favorites.push(currentSong);
+    localStorage.setItem('musicFavs', JSON.stringify(favorites));
+    renderResults();
+    renderQueue();
+    renderFavorites();
+    updatePlayerFavIcon();
+  }
+
+  function removeFav(index) {
+    favorites.splice(index, 1);
+    localStorage.setItem('musicFavs', JSON.stringify(favorites));
+    renderFavorites();
+    updatePlayerFavIcon();
+  }
+
+  function updatePlayerFavIcon() {
+    if(!currentSong) {
+      document.getElementById('playerFavBtn').innerText = '🤍';
+      return;
+    }
+    const isFav = favorites.some(f => f.id === currentSong.id);
+    document.getElementById('playerFavBtn').innerText = isFav ? '❤️' : '🤍';
+  }
+
+  // --- Player ---
+  function playFromSearch(index) {
+    currentSong = searchResults[index];
+    playSong(currentSong);
+    // Auto add to queue if not there
+    if(!queue.find(q => q.id === currentSong.id)) {
+      queue.push(currentSong);
+      renderQueue();
+    }
+  }
+
+  function playFromQueue(index) {
+    currentSong = queue[index];
+    playSong(currentSong);
+  }
+
+  function playFav(index) {
+    currentSong = favorites[index];
+    playSong(currentSong);
   }
 
   function playSong(song) {
-    if (!song) return;
     document.getElementById('playerImg').src = song.image || '';
     document.getElementById('playerTitle').innerText = song.title;
     document.getElementById('playerArtist').innerText = song.subtitle || '';
+    updatePlayerFavIcon();
     
-    // Use 320kbps by default
     const url = song.download_urls['320'] || song.download_url;
     audio.src = url;
     audio.play().then(() => {
       isPlaying = true;
       document.getElementById('playPauseBtn').innerText = '⏸️';
     }).catch(e => console.log("Playback failed:", e));
-  }
-
-  function stopPlayer() {
-    audio.pause();
-    audio.src = '';
-    isPlaying = false;
-    document.getElementById('playPauseBtn').innerText = '▶️';
-    document.getElementById('playerTitle').innerText = 'Select a song';
-    document.getElementById('playerArtist').innerText = '-';
-    document.getElementById('playerImg').src = 'https://via.placeholder.com/60?text=Music';
-    document.getElementById('progressFill').style.width = '0%';
-    document.getElementById('currTime').innerText = '0:00';
-    document.getElementById('totalTime').innerText = '0:00';
   }
 
   function togglePlay() {
@@ -380,18 +484,18 @@ HTML_PAGE = """
   }
 
   function playNext() {
-    if (currentIndex < queue.length - 1) {
-      currentIndex++;
-      playSong(queue[currentIndex]);
-      renderQueue();
+    if(!currentSong) return;
+    const idx = queue.findIndex(q => q.id === currentSong.id);
+    if (idx > -1 && idx < queue.length - 1) {
+      playFromQueue(idx + 1);
     }
   }
 
   function playPrev() {
-    if (currentIndex > 0) {
-      currentIndex--;
-      playSong(queue[currentIndex]);
-      renderQueue();
+    if(!currentSong) return;
+    const idx = queue.findIndex(q => q.id === currentSong.id);
+    if (idx > 0) {
+      playFromQueue(idx - 1);
     }
   }
 
@@ -416,9 +520,7 @@ HTML_PAGE = """
     if (audio.duration) audio.currentTime = percent * audio.duration;
   }
 
-  function changeVolume(val) {
-    audio.volume = val;
-  }
+  function changeVolume(val) { audio.volume = val; }
 
   function formatTime(seconds) {
     const m = Math.floor(seconds / 60);
@@ -426,8 +528,9 @@ HTML_PAGE = """
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   }
 
-  // Initialize empty queue on load
+  // Init
   renderQueue();
+  renderFavorites();
 </script>
 </body>
 </html>
