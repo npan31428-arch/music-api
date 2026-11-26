@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from mutagen.mp4 import MP4, MP4Cover
 
-app = FastAPI(title="Chill Music API")
+app = FastAPI(title="Apple Music Glass API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,39 +37,53 @@ def download_file(url: str, title: str, artist: str, image: str = ""):
             audio = MP4(audio_io)
             audio["\xa9nam"] = title
             audio["\xa9ART"] = artist
+            
             if image:
                 try:
                     img_res = requests.get(image, timeout=10)
                     if img_res.status_code == 200:
                         audio["covr"] = [MP4Cover(img_res.content, imageformat=MP4Cover.FORMAT_JPEG)]
                 except: pass
+                    
             audio.save(audio_io)
             audio_io.seek(0)
-        except: pass
+        except Exception as e:
+            print(f"Tagging failed: {e}")
+            audio_io.seek(0)
 
         safe_title = "".join([c for c in title if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
         safe_artist = "".join([c for c in artist if c.isalpha() or c.isdigit() or c in ' -_']).rstrip()
         filename = f"{safe_title} - {safe_artist}.m4a"
 
-        return Response(content=audio_io.read(), media_type="audio/mp4", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+        return Response(
+            content=audio_io.read(),
+            media_type="audio/mp4",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ==========================================
+# APPLE MUSIC DESKTOP UI (Matching Image)
+# ==========================================
 HTML_PAGE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chill Ratna</title>
+<title>Apple Music Glass</title>
 <style>
   :root {
     --apple-red: #FA233B;
-    --glass-bg: rgba(20, 20, 25, 0.7);
+    --apple-red-hover: #E32035;
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-hover: rgba(255, 255, 255, 0.1);
     --glass-border: rgba(255, 255, 255, 0.08);
     --text-main: #FFFFFF;
     --text-sec: #A1A1A6;
-    --sidebar-width: 260px;
+    --sidebar-width: 250px;
     --player-height: 90px;
   }
 
@@ -84,173 +98,245 @@ HTML_PAGE = """
     position: relative;
   }
 
-  /* Animated Background */
-  .bg-orb { position: absolute; border-radius: 50%; filter: blur(100px); z-index: -1; opacity: 0.4; animation: float 10s infinite alternate ease-in-out; }
+  /* Background Orbs for Glass */
+  .bg-orb { position: absolute; border-radius: 50%; filter: blur(100px); z-index: 0; opacity: 0.4; animation: float 15s infinite alternate ease-in-out; }
   .orb-1 { width: 500px; height: 500px; background: #FA233B; top: -150px; left: -150px; }
   .orb-2 { width: 600px; height: 600px; background: #5E5CE6; bottom: -200px; right: -100px; animation-delay: -5s; }
-  @keyframes float { 0% { transform: translate(0, 0); } 100% { transform: translate(50px, 50px); } }
+  .orb-3 { width: 400px; height: 400px; background: #FF9500; top: 30%; left: 40%; opacity: 0.2; }
+  @keyframes float { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(40px, 60px) scale(1.1); } }
 
-  .glass { background: var(--glass-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); border: 1px solid var(--glass-border); }
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  }
 
-  /* --- SIDEBAR --- */
+  /* ========== SIDEBAR ========== */
   .sidebar {
-    width: var(--sidebar-width); height: 100%; padding: 25px 15px;
-    display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--glass-border);
-    z-index: 10; background: rgba(0,0,0,0.8); backdrop-filter: blur(20px);
+    width: var(--sidebar-width);
+    height: 100%;
+    padding: 30px 20px;
+    display: flex; flex-direction: column; gap: 30px;
+    border-right: 1px solid var(--glass-border);
+    z-index: 10;
   }
-  .brand { font-size: 1.8rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 30px; padding-left: 10px; display: flex; align-items: center; gap: 10px;}
-  .brand span { color: var(--apple-red); }
   
+  .logo { font-size: 1.8rem; font-weight: 800; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px;}
+  .logo span { color: var(--apple-red); font-size: 2rem; }
+  
+  .nav-menu { display: flex; flex-direction: column; gap: 10px; }
   .nav-item {
-    display: flex; align-items: center; gap: 15px; padding: 12px 15px;
-    border-radius: 10px; cursor: pointer; color: var(--text-sec); font-weight: 600; font-size: 1rem; transition: 0.2s;
+    display: flex; align-items: center; gap: 15px; padding: 12px 15px; border-radius: 10px;
+    color: var(--text-main); text-decoration: none; font-weight: 600; font-size: 1rem;
+    cursor: pointer; transition: 0.2s; opacity: 0.7;
   }
-  .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.1); color: white; }
+  .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.1); opacity: 1; }
+  .nav-item.active { background: rgba(255,255,255,0.15); }
   
-  /* --- MAIN CONTENT --- */
-  .main-view {
-    flex: 1; height: 100%; overflow-y: auto; padding: 20px 40px 120px 40px; position: relative;
+  /* ========== MAIN CONTENT ========== */
+  .main-wrapper {
+    flex: 1; height: 100%; display: flex; flex-direction: column;
+    overflow: hidden; z-index: 10;
   }
-  
-  .top-bar { display: flex; justify-content: center; margin-bottom: 40px; margin-top: 10px;}
-  .search-container {
-    display: flex; align-items: center; background: rgba(255,255,255,0.08);
-    border-radius: 30px; padding: 12px 25px; width: 100%; max-width: 600px; border: 1px solid transparent; transition: 0.3s;
-  }
-  .search-container:focus-within { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); }
-  .search-container input { flex: 1; background: transparent; border: none; color: white; font-size: 1rem; outline: none; margin-left: 10px;}
-  .search-container input::placeholder { color: var(--text-sec); }
 
-  .section-header { font-size: 1.5rem; font-weight: 700; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;}
+  /* Top Search Bar */
+  .top-bar { padding: 20px 40px; display: flex; justify-content: center; align-items: center;}
+  .search-box {
+    width: 100%; max-width: 600px; position: relative; display: flex; align-items: center;
+  }
+  .search-box input {
+    width: 100%; padding: 14px 20px 14px 45px; border-radius: 12px; border: none;
+    background: rgba(255, 255, 255, 0.15); color: white; font-size: 1rem; outline: none;
+    transition: 0.3s; backdrop-filter: blur(10px);
+  }
+  .search-box input::placeholder { color: var(--text-sec); }
+  .search-box input:focus { background: rgba(255, 255, 255, 0.25); }
+  .search-icon { position: absolute; left: 15px; color: var(--text-sec); font-size: 1.2rem; }
+
+  /* Content Area */
+  .content-scroll { flex: 1; overflow-y: auto; padding: 0 40px 120px 40px; }
+
+  .section-title { font-size: 1.4rem; font-weight: 700; margin: 30px 0 20px 0; }
+
+  /* Discover Grid (Matching Image Layout) */
+  .grid-layout {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;
+  }
   
-  /* Grid Layouts */
-  .songs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-bottom: 40px;}
-  .playlists-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
-  
-  /* Song Cards */
   .song-card {
-    display: flex; align-items: center; gap: 15px; padding: 10px; border-radius: 12px;
-    transition: 0.2s; cursor: pointer; border: 1px solid transparent; position: relative;
+    display: flex; align-items: center; gap: 15px; padding: 10px; border-radius: 10px;
+    background: transparent; transition: 0.2s; cursor: pointer; position: relative;
   }
-  .song-card:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); }
-  .song-card img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
-  .song-info { flex: 1; min-width: 0; }
-  .song-title { font-weight: 600; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .song-meta { font-size: 0.85rem; color: var(--text-sec); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+  .song-card:hover { background: rgba(255,255,255,0.08); }
+  .song-card img { width: 55px; height: 55px; border-radius: 6px; object-fit: cover; }
   
-  /* Hover Actions */
-  .song-actions { display: flex; gap: 8px; opacity: 0; transition: 0.2s; position: absolute; right: 10px; background: linear-gradient(90deg, transparent, #1a1a1a 30%); padding-left: 20px;}
-  .song-card:hover .song-actions { opacity: 1; }
-  .icon-btn { background: white; color: black; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1rem; transition: 0.2s;}
-  .icon-btn:hover { transform: scale(1.1); }
-  .icon-btn.dl { background: rgba(255,255,255,0.2); color: white; border-radius: 8px; width: auto; padding: 0 10px; font-size: 0.8rem; font-weight: bold;}
+  .song-info { flex: 1; min-width: 0; }
+  .song-title { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .song-artist { font-size: 0.8rem; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px;}
+  
+  .card-actions { display: flex; gap: 5px; align-items: center; opacity: 0; transition: 0.2s; }
+  .song-card:hover .card-actions { opacity: 1; }
+  
+  .btn-icon {
+    background: none; border: none; color: white; font-size: 1.1rem; cursor: pointer;
+    padding: 5px; border-radius: 5px; transition: 0.2s;
+  }
+  .btn-icon:hover { background: rgba(255,255,255,0.2); }
+  .btn-play { color: var(--apple-red); font-size: 1.5rem; margin-right: 5px;}
+  .btn-play:hover { color: var(--apple-red-hover); transform: scale(1.1); background: none; }
 
-  /* Playlist Cards */
-  .playlist-card { cursor: pointer; transition: 0.2s; }
-  .playlist-card:hover { transform: translateY(-5px); }
-  .playlist-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
-  .playlist-title { font-weight: 600; font-size: 1rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
-  .playlist-desc { font-size: 0.85rem; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+  /* Queue / Favorites Sidebar (Hidden by default on mobile) */
+  .side-panel {
+    width: 350px; height: 100%; border-left: 1px solid var(--glass-border);
+    display: flex; flex-direction: column; z-index: 10;
+    transition: 0.3s; transform: translateX(100%); position: absolute; right: 0; top: 0; bottom: var(--player-height);
+  }
+  .side-panel.open { transform: translateX(0); position: relative; }
+  .panel-header { padding: 20px; font-weight: bold; display: flex; justify-content: space-between; border-bottom: 1px solid var(--glass-border);}
+  .panel-content { flex: 1; overflow-y: auto; padding: 10px; }
 
-  /* --- BOTTOM PLAYER BAR --- */
+  /* ========== PLAYER BAR ========== */
   .player-bar {
     position: fixed; bottom: 0; left: 0; right: 0; height: var(--player-height);
-    background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
-    border-top: 1px solid var(--glass-border); display: flex; align-items: center; justify-content: space-between;
-    padding: 0 25px; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+    border-top: 1px solid var(--glass-border); z-index: 50;
   }
   
-  .player-left { display: flex; align-items: center; gap: 15px; width: 30%; min-width: 200px;}
-  .player-left img { width: 55px; height: 55px; border-radius: 8px; object-fit: cover; }
-  .player-info { min-width: 0; }
-  .player-title { font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .player-artist { font-size: 0.8rem; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;}
+  .now-playing { display: flex; align-items: center; gap: 15px; width: 30%; }
+  .now-playing img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
+  .now-playing .info { display: flex; flex-direction: column; }
   
-  .player-center { display: flex; flex-direction: column; align-items: center; flex: 1; max-width: 600px;}
-  .player-controls { display: flex; gap: 25px; align-items: center; margin-bottom: 8px; }
-  .ctrl-btn { background: none; border: none; color: var(--text-sec); font-size: 1.2rem; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center;}
-  .ctrl-btn:hover { color: white; }
-  .play-btn { font-size: 2rem; color: white; background: white; color: black; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .player-controls { display: flex; flex-direction: column; align-items: center; width: 40%; }
+  .controls-btns { display: flex; align-items: center; gap: 20px; margin-bottom: 8px; }
+  .controls-btns button { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; transition: 0.2s; }
+  .controls-btns button:hover { color: var(--apple-red); }
+  .controls-btns .play-btn { font-size: 2rem; color: white; margin: 0 10px;}
   
-  .progress-wrap { width: 100%; display: flex; align-items: center; gap: 10px; font-size: 0.75rem; color: var(--text-sec); }
-  .progress-bar { flex: 1; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; cursor: pointer; position: relative; }
-  .progress-fill { height: 100%; background: white; width: 0%; border-radius: 2px; transition: 0.1s; }
+  .progress-container { width: 100%; display: flex; align-items: center; gap: 10px; font-size: 0.75rem; color: var(--text-sec); }
+  .progress-bar { flex: 1; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; cursor: pointer; position: relative;}
+  .progress-fill { height: 100%; background: white; width: 0%; border-radius: 2px; }
   
-  .player-right { width: 30%; display: flex; justify-content: flex-end; align-items: center; gap: 15px; }
-  .volume-slider { width: 100px; accent-color: white; }
-  
-  /* Custom Scrollbar */
-  ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
-  
-  .loading-spinner { text-align: center; color: var(--text-sec); padding: 40px; font-size: 1.2rem;}
+  .player-options { width: 30%; display: flex; justify-content: flex-end; align-items: center; gap: 15px; }
+  .volume-control { display: flex; align-items: center; gap: 8px; }
+  .volume-control input { width: 100px; accent-color: white; }
 
-  @media (max-width: 800px) {
-    .sidebar { display: none; }
-    .main-view { padding: 20px 15px 120px 15px; }
-    .player-left { width: 40%; }
-    .player-center { max-width: 40%; }
-    .player-right { display: none; }
+  /* Download Popup Menu */
+  .dl-menu {
+    position: absolute; background: #222; border: 1px solid #444; border-radius: 8px;
+    padding: 5px; display: none; flex-direction: column; gap: 2px; z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+  }
+  .dl-menu.show { display: flex; }
+  .dl-menu button {
+    background: none; border: none; color: white; padding: 8px 15px; text-align: left;
+    border-radius: 4px; cursor: pointer; font-size: 0.85rem;
+  }
+  .dl-menu button:hover { background: var(--apple-red); }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 80px; padding: 20px 10px; align-items: center; }
+    .logo span { font-size: 1.8rem; }
+    .logo text { display: none; }
+    .nav-item span { display: none; }
+    .nav-item { justify-content: center; padding: 15px; }
+    .content-scroll { padding: 0 20px 120px 20px; }
+    .now-playing { width: 40%; }
+    .now-playing .info { display: none; }
+    .player-controls { width: 60%; }
+    .player-options { display: none; }
   }
 </style>
 </head>
 <body>
 
-<!-- Background Orbs -->
 <div class="bg-orb orb-1"></div>
 <div class="bg-orb orb-2"></div>
+<div class="bg-orb orb-3"></div>
 
-<!-- SIDEBAR -->
-<div class="sidebar">
-  <div class="brand"><span>🎧</span> Chill Ratna</div>
-  
-  <div class="nav-item active" onclick="loadHome()">
-    <span>🏠</span> Home
-  </div>
-  <div class="nav-item" onclick="switchView('favorites')">
-    <span>❤️</span> Favorites
-  </div>
-  <div class="nav-item" onclick="switchView('queue')">
-    <span>⏭️</span> My Queue
+<!-- Sidebar -->
+<div class="sidebar glass">
+  <div class="logo"><span></span> Music</div>
+  <div class="nav-menu">
+    <div class="nav-item active" onclick="showHome()"><span>🏠</span> <text>Home</text></div>
+    <div class="nav-item" onclick="showFavs()"><span>❤️</span> <text>Favorites</text></div>
+    <div class="nav-item" onclick="togglePanel()"><span>📋</span> <text>Queue</text></div>
   </div>
 </div>
 
-<!-- MAIN VIEW -->
-<div class="main-view" id="mainView">
-  
+<!-- Main Wrapper -->
+<div class="main-wrapper">
   <div class="top-bar">
-    <div class="search-container glass">
-      <span>🔍</span>
-      <input id="q" placeholder="Songs, Playlists, Album or Artist" onkeypress="if(event.key === 'Enter') doSearch()">
+    <form class="search-box" onsubmit="doSearch(event)">
+      <span class="search-icon">🔍</span>
+      <input id="q" placeholder="Songs, Playlists, Album or Artist" autocomplete="off">
+    </form>
+  </div>
+
+  <div class="content-scroll" id="content-area">
+    
+    <!-- Discover Section (Trending Songs) -->
+    <div id="home-view">
+      <div class="section-title">Discover</div>
+      <div class="grid-layout" id="discover-grid">
+        <!-- Populated by JS on load -->
+      </div>
+      
+      <div class="section-title">Trending community playlists</div>
+      <div class="grid-layout" id="trending-grid">
+         <!-- Populated by JS on load -->
+      </div>
     </div>
-  </div>
 
-  <div id="dynamicContent">
-    <!-- Content will be injected here -->
-  </div>
+    <!-- Search Results View -->
+    <div id="search-view" style="display:none;">
+      <div class="section-title">Search Results</div>
+      <div class="grid-layout" id="search-grid"></div>
+    </div>
+    
+    <!-- Favorites View -->
+    <div id="favs-view" style="display:none;">
+      <div class="section-title">Your Favorites</div>
+      <div class="grid-layout" id="favs-grid"></div>
+    </div>
 
+  </div>
 </div>
 
-<!-- PLAYER BAR -->
-<div class="player-bar">
-  <div class="player-left">
-    <img id="playerImg" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='55' height='55'><rect width='55' height='55' fill='%23222'/></svg>">
-    <div class="player-info">
-      <div class="player-title" id="playerTitle">Select a song</div>
-      <div class="player-artist" id="playerArtist">-</div>
+<!-- Side Panel for Queue -->
+<div class="side-panel glass" id="queue-panel">
+  <div class="panel-header">
+    <span>Up Next</span>
+    <button class="btn-icon" onclick="togglePanel()">✖</button>
+  </div>
+  <div class="panel-content" id="queue-list">
+    <!-- Queue items render here -->
+  </div>
+</div>
+
+<!-- Player Bar -->
+<div class="player-bar glass">
+  <div class="now-playing">
+    <img id="playerImg" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><rect width='60' height='60' fill='%23222'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='24' fill='%23666'>🎵</text></svg>">
+    <div class="info">
+      <div class="song-title" id="playerTitle" style="font-size:0.95rem;">Not Playing</div>
+      <div class="song-artist" id="playerArtist">-</div>
     </div>
-    <button class="ctrl-btn" id="playerFavBtn" onclick="toggleFavCurrent()" style="margin-left:10px;">🤍</button>
+    <button class="btn-icon" id="playerFavBtn" onclick="toggleFavCurrent()" style="margin-left:10px;">🤍</button>
   </div>
   
-  <div class="player-center">
-    <div class="player-controls">
-      <button class="ctrl-btn" onclick="playPrev()">⏮</button>
-      <button class="ctrl-btn play-btn" id="playPauseBtn" onclick="togglePlay()">▶</button>
-      <button class="ctrl-btn" onclick="playNext()">⏭</button>
+  <div class="player-controls">
+    <div class="controls-btns">
+      <button onclick="playPrev()">⏮️</button>
+      <button class="play-btn" id="playPauseBtn" onclick="togglePlay()">▶️</button>
+      <button onclick="playNext()">⏭️</button>
     </div>
-    <div class="progress-wrap">
+    <div class="progress-container">
       <span id="currTime">0:00</span>
       <div class="progress-bar" onclick="seekAudio(event)">
         <div class="progress-fill" id="progressFill"></div>
@@ -259,9 +345,11 @@ HTML_PAGE = """
     </div>
   </div>
 
-  <div class="player-right">
-    <span>🔊</span>
-    <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.01" value="1" onchange="changeVolume(this.value)">
+  <div class="player-options">
+    <div class="volume-control">
+      <span>🔊</span>
+      <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1" onchange="changeVolume(this.value)">
+    </div>
   </div>
 </div>
 
@@ -270,215 +358,296 @@ HTML_PAGE = """
 <script>
   let searchResults = [];
   let queue = [];
-  let favorites = JSON.parse(localStorage.getItem('chillFavs')) || [];
+  let favorites = JSON.parse(localStorage.getItem('musicFavs')) || [];
   let currentSong = null;
   let isPlaying = false;
-  let currentView = 'home';
   const audio = document.getElementById('audioPlayer');
-  const mainView = document.getElementById('dynamicContent');
 
-  // INITIAL LOAD (Jadu: Blank homepage fix)
-  window.onload = () => {
-    // Default search to populate the homepage
-    document.getElementById('q').value = "Himesh Reshammiya";
-    doSearch(true); 
+  // ==========================================
+  // INITIAL LOAD (Auto Suggestions on App Open)
+  // ==========================================
+  window.onload = async () => {
+    loadHomepageData();
   };
 
-  // --- NAVIGATION & VIEWS ---
-  function setActiveNav(index) {
+  async function loadHomepageData() {
+    // College Girls / Trending Search Keywords
+    const trendingQueries = [
+       "Top Bollywood Hits", "Arijit Singh Best Songs", "Trending Reels Songs", 
+       "Shreya Ghoshal Hits", "Punjabi Top 50", "English Pop Hits"
+    ];
+    
+    const discoverGrid = document.getElementById('discover-grid');
+    const trendingGrid = document.getElementById('trending-grid');
+    
+    // Skeleton Loading
+    const skeleton = `<div class="song-card"><div style="width:55px;height:55px;background:rgba(255,255,255,0.1);border-radius:6px;"></div><div class="song-info"><div style="width:80%;height:12px;background:rgba(255,255,255,0.1);margin-bottom:8px;border-radius:4px;"></div><div style="width:50%;height:10px;background:rgba(255,255,255,0.1);border-radius:4px;"></div></div></div>`;
+    discoverGrid.innerHTML = skeleton.repeat(8);
+    trendingGrid.innerHTML = skeleton.repeat(8);
+
+    try {
+      // Fetch multiple categories to make the homepage look full
+      const reqs = trendingQueries.map(q => fetch(`/api/search?song=${encodeURIComponent(q)}`).then(res => res.json()));
+      const responses = await Promise.all(reqs);
+      
+      let allSongs = [];
+      responses.forEach(data => {
+        if(data.results) allSongs = allSongs.concat(data.results);
+      });
+
+      // Shuffle and slice for variety
+      allSongs = allSongs.sort(() => 0.5 - Math.random());
+      
+      let discoverSongs = allSongs.slice(0, 8);
+      let trendingSongs = allSongs.slice(8, 16);
+
+      renderGrid(discoverGrid, discoverSongs, 'discover');
+      renderGrid(trendingGrid, trendingSongs, 'trending');
+      
+      // Store in global array so play works
+      searchResults = allSongs;
+      
+    } catch(e) {
+      discoverGrid.innerHTML = '<p style="color:var(--text-sec)">Failed to load suggestions. Please search manually.</p>';
+      trendingGrid.innerHTML = '';
+    }
+  }
+
+  function showHome() {
+    document.getElementById('home-view').style.display = 'block';
+    document.getElementById('search-view').style.display = 'none';
+    document.getElementById('favs-view').style.display = 'none';
+    updateActiveNav(0);
+  }
+
+  function showFavs() {
+    document.getElementById('home-view').style.display = 'none';
+    document.getElementById('search-view').style.display = 'none';
+    document.getElementById('favs-view').style.display = 'block';
+    updateActiveNav(1);
+    renderFavorites();
+  }
+
+  function updateActiveNav(index) {
     document.querySelectorAll('.nav-item').forEach((el, i) => {
       if(i === index) el.classList.add('active');
       else el.classList.remove('active');
     });
   }
 
-  function loadHome() {
-    setActiveNav(0);
-    if(searchResults.length > 0) renderHomeGrid();
-    else doSearch(true);
+  function togglePanel() {
+    document.getElementById('queue-panel').classList.toggle('open');
+    updateActiveNav(2);
   }
 
-  function switchView(view) {
-    currentView = view;
-    mainView.innerHTML = '';
-    if(view === 'favorites') {
-      setActiveNav(1);
-      renderView('My Favorites', favorites, 'fav');
-    } else if(view === 'queue') {
-      setActiveNav(2);
-      renderView('Up Next in Queue', queue, 'queue');
-    }
-  }
-
-  // --- SEARCH & RENDERING ---
-  async function doSearch(isDefault = false) {
+  // ==========================================
+  // SEARCH
+  // ==========================================
+  async function doSearch(e) {
+    e.preventDefault();
     const query = document.getElementById('q').value.trim();
     if (!query) return;
+
+    document.getElementById('home-view').style.display = 'none';
+    document.getElementById('favs-view').style.display = 'none';
+    document.getElementById('search-view').style.display = 'block';
     
-    if(!isDefault) setActiveNav(0);
-    mainView.innerHTML = '<div class="loading-spinner">Loading...</div>';
+    const grid = document.getElementById('search-grid');
+    grid.innerHTML = '<p>Searching...</p>';
 
     try {
       const res = await fetch('/api/search?song=' + encodeURIComponent(query));
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Error');
-      
       searchResults = data.results || [];
-      currentView = 'home';
-      renderHomeGrid();
+      renderGrid(grid, searchResults, 'search');
     } catch (err) {
-      mainView.innerHTML = `<div class="loading-spinner" style="color:var(--apple-red)">Error: ${err.message}</div>`;
+      grid.innerHTML = `<p style="color:var(--apple-red)">${err.message}</p>`;
     }
   }
 
-  function renderHomeGrid() {
-    if(searchResults.length === 0) return;
-
-    let html = `
-      <div class="section-header">Discover</div>
-      <div class="songs-grid">
-        ${searchResults.slice(0, 12).map((s, i) => generateSongCard(s, i, 'search')).join('')}
-      </div>
-
-      <div class="section-header">Trending Playlists</div>
-      <div class="playlists-grid">
-        ${searchResults.slice(12, 20).map((s, i) => `
-          <div class="playlist-card" onclick="playFromSearch(${i+12})">
-            <img src="${s.image}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'200\\' height=\\'200\\'><rect width=\\'200\\' height=\\'200\\' fill=\\'%23222\\'/></svg>'">
-            <div class="playlist-title">${s.title}</div>
-            <div class="playlist-desc">${s.artists ? s.artists[0] : 'Various Artists'}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    mainView.innerHTML = html;
-  }
-
-  function renderView(title, list, type) {
-    if(list.length === 0) {
-      mainView.innerHTML = `<div class="section-header">${title}</div><div class="loading-spinner">No songs here yet.</div>`;
+  // ==========================================
+  // RENDER UI
+  // ==========================================
+  function renderGrid(container, songs, context) {
+    if(songs.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-sec)">No songs found.</p>';
       return;
     }
-    mainView.innerHTML = `
-      <div class="section-header">${title}</div>
-      <div class="songs-grid">
-        ${list.map((s, i) => generateSongCard(s, i, type)).join('')}
-      </div>
-    `;
+    container.innerHTML = songs.map((s, i) => generateCard(s, i, context)).join('');
   }
 
-  function generateSongCard(s, index, source) {
+  function generateCard(s, index, context) {
     const isFav = favorites.some(f => f.id === s.id);
     const favIcon = isFav ? '❤️' : '🤍';
+    const artistName = s.artists ? s.artists[0] : 'Unknown Artist';
+    
+    // Download links hidden in a menu
     const urls = s.download_urls || {};
-    const artistName = s.artists ? s.artists.join(', ') : 'Unknown';
-    
-    // Download Buttons
-    let dlHtml = '';
-    if(urls['320']) dlHtml += `<button onclick="event.stopPropagation(); downloadSong(this, '${urls['320']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')" class="icon-btn dl">320k</button>`;
-    
-    // Play Function logic based on source
-    let playAction = `playFromSearch(${index})`;
-    if(source === 'fav') playAction = `playFav(${index})`;
-    if(source === 'queue') playAction = `playFromQueue(${index})`;
+    let dlOptions = '';
+    if(urls['320']) dlOptions += `<button onclick="downloadSong(event, '${urls['320']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')">Download 320kbps</button>`;
+    if(urls['160']) dlOptions += `<button onclick="downloadSong(event, '${urls['160']}', '${sanitizeText(s.title)}', '${sanitizeText(artistName)}', '${s.image}')">Download 160kbps</button>`;
+
+    // Use global index for playing
+    const globalIndex = searchResults.findIndex(x => x.id === s.id);
 
     return `
-      <div class="song-card" onclick="${playAction}">
+      <div class="song-card" onmouseleave="hideAllMenus()">
         <img src="${s.image || ''}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'60\\' height=\\'60\\'><rect width=\\'60\\' height=\\'60\\' fill=\\'%23222\\'/></svg>'">
-        <div class="song-info">
+        <div class="song-info" onclick="playSongByIndex(${globalIndex})">
           <div class="song-title">${s.title}</div>
-          <div class="song-meta">${s.artists ? s.artists[0] : 'Unknown'}</div>
+          <div class="song-artist">${s.subtitle || artistName}</div>
         </div>
-        <div class="song-actions">
-          ${dlHtml}
-          <button onclick="event.stopPropagation(); toggleFav(${index}, '${source}')" class="icon-btn" style="background:transparent">${favIcon}</button>
+        
+        <div class="card-actions">
+          <button class="btn-icon btn-play" onclick="playSongByIndex(${globalIndex})">▶</button>
+          <button class="btn-icon" onclick="addToQueueById('${s.id}')" title="Add to Queue">+</button>
+          
+          <div style="position:relative;">
+            <button class="btn-icon" onclick="toggleDlMenu(event)">⬇</button>
+            <div class="dl-menu">
+               ${dlOptions}
+               <button onclick="addToQueueById('${s.id}')">Add to Queue</button>
+            </div>
+          </div>
+          
+          <button class="btn-icon" onclick="toggleFavById('${s.id}')">${favIcon}</button>
         </div>
       </div>
     `;
   }
 
-  // --- QUEUE & FAVORITES ---
-  function addToQueue(index) {
-    queue.push(searchResults[index]);
-    if(currentView === 'queue') renderView('Up Next in Queue', queue, 'queue');
+  function toggleDlMenu(e) {
+    e.stopPropagation();
+    hideAllMenus();
+    const menu = e.currentTarget.nextElementSibling;
+    menu.classList.toggle('show');
   }
 
-  function toggleFav(index, source) {
-    let song = source === 'search' ? searchResults[index] : (source === 'queue' ? queue[index] : favorites[index]);
-    const exists = favorites.findIndex(f => f.id === song.id);
-    if (exists > -1) {
-      favorites.splice(exists, 1);
-    } else {
-      favorites.push(song);
-    }
-    localStorage.setItem('chillFavs', JSON.stringify(favorites));
+  function hideAllMenus() {
+    document.querySelectorAll('.dl-menu').forEach(m => m.classList.remove('show'));
+  }
+
+  function sanitizeText(text) {
+    return text.replace(/'/g, "\\\\'").replace(/"/g, '&quot;');
+  }
+
+  function downloadSong(e, url, title, artist, image) {
+    e.stopPropagation();
+    const btn = e.target;
+    const originalText = btn.innerText;
+    btn.innerText = 'Downloading...';
+    btn.disabled = true;
     
-    // Refresh current view
-    if(currentView === 'home') renderHomeGrid();
-    else if(currentView === 'favorites') renderView('My Favorites', favorites, 'fav');
-    else if(currentView === 'queue') renderView('Up Next in Queue', queue, 'queue');
+    const dlUrl = `/api/dl?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&image=${encodeURIComponent(image)}`;
+    window.location.href = dlUrl; 
     
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.disabled = false;
+      hideAllMenus();
+    }, 4000);
+  }
+
+  // ==========================================
+  // FAVORITES & QUEUE LOGIC
+  // ==========================================
+  function toggleFavById(id) {
+    const song = searchResults.find(s => s.id === id) || queue.find(s => s.id === id) || favorites.find(s => s.id === id);
+    if(!song) return;
+    const exists = favorites.findIndex(f => f.id === id);
+    
+    if (exists > -1) favorites.splice(exists, 1);
+    else favorites.push(song);
+    
+    localStorage.setItem('musicFavs', JSON.stringify(favorites));
+    
+    // Rerender current view based on active tab
+    if(document.getElementById('home-view').style.display !== 'none') loadHomepageData();
+    else if(document.getElementById('search-view').style.display !== 'none') renderGrid(document.getElementById('search-grid'), searchResults, 'search');
+    else if(document.getElementById('favs-view').style.display !== 'none') renderFavorites();
+    
+    renderQueue();
     updatePlayerFavIcon();
   }
 
   function toggleFavCurrent() {
     if(!currentSong) return;
-    const exists = favorites.findIndex(f => f.id === currentSong.id);
-    if (exists > -1) favorites.splice(exists, 1);
-    else favorites.push(currentSong);
-    localStorage.setItem('chillFavs', JSON.stringify(favorites));
-    updatePlayerFavIcon();
-    if(currentView === 'favorites') renderView('My Favorites', favorites, 'fav');
+    toggleFavById(currentSong.id);
   }
 
-  function updatePlayerFavIcon() {
-    if(!currentSong) { document.getElementById('playerFavBtn').innerText = '🤍'; return; }
-    const isFav = favorites.some(f => f.id === currentSong.id);
-    document.getElementById('playerFavBtn').innerText = isFav ? '❤️' : '🤍';
+  function renderFavorites() {
+    const grid = document.getElementById('favs-grid');
+    if(favorites.length === 0) {
+      grid.innerHTML = '<p style="color:var(--text-sec)">No favorites yet.</p>';
+      return;
+    }
+    grid.innerHTML = favorites.map((s, i) => generateCard(s, i, 'fav')).join('');
   }
 
-  // --- DOWNLOAD ---
-  function sanitizeText(text) {
-    return text.replace(/'/g, "\\\\'").replace(/"/g, '&quot;');
+  function addToQueueById(id) {
+    const song = searchResults.find(s => s.id === id);
+    if(!song) return;
+    if(queue.find(q => q.id === id)) return; // Already in queue
+    
+    queue.push(song);
+    renderQueue();
+    if(!currentSong) playSongByIndex(searchResults.findIndex(s => s.id === id));
   }
 
-  function downloadSong(btn, url, title, artist, image) {
-    const originalText = btn.innerText;
-    btn.innerText = '⌛';
-    btn.disabled = true;
-    const dlUrl = `/api/dl?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&image=${encodeURIComponent(image)}`;
-    window.location.href = dlUrl; 
-    setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 4000);
+  function renderQueue() {
+    const list = document.getElementById('queue-list');
+    if(queue.length === 0) {
+      list.innerHTML = '<p style="color:var(--text-sec);text-align:center;margin-top:20px;">Queue is empty</p>';
+      return;
+    }
+    list.innerHTML = queue.map((s, i) => `
+      <div class="song-card" style="${currentSong && currentSong.id === s.id ? 'border:1px solid var(--apple-red)' : ''}">
+        <img src="${s.image}" style="width:45px;height:45px;">
+        <div class="song-info" onclick="playQueueIndex(${i})">
+           <div class="song-title">${s.title}</div>
+           <div class="song-artist">${s.subtitle || ''}</div>
+        </div>
+        <button class="btn-icon" onclick="removeFromQueue(${i})">✖</button>
+      </div>
+    `).join('');
   }
 
-  // --- PLAYER LOGIC ---
-  function playFromSearch(index) {
-    currentSong = searchResults[index];
-    playSong(currentSong);
-    addToQueue(index); // Auto add to queue
+  function removeFromQueue(i) {
+    queue.splice(i, 1);
+    renderQueue();
   }
 
-  function playFromQueue(index) {
+  // ==========================================
+  // AUDIO PLAYER LOGIC
+  // ==========================================
+  function playSongByIndex(index) {
+    const song = searchResults[index];
+    if(!song) return;
+    currentSong = song;
+    loadAndPlay(song);
+    if(!queue.find(q => q.id === song.id)) {
+      queue.push(song);
+      renderQueue();
+    }
+  }
+
+  function playQueueIndex(index) {
     currentSong = queue[index];
-    playSong(currentSong);
+    loadAndPlay(currentSong);
   }
 
-  function playFav(index) {
-    currentSong = favorites[index];
-    playSong(currentSong);
-  }
-
-  function playSong(song) {
+  function loadAndPlay(song) {
     document.getElementById('playerImg').src = song.image || '';
     document.getElementById('playerTitle').innerText = song.title;
-    document.getElementById('playerArtist').innerText = song.artists ? song.artists[0] : '-';
+    document.getElementById('playerArtist').innerText = song.subtitle || '';
     updatePlayerFavIcon();
+    renderQueue();
     
     const url = song.download_urls['320'] || song.download_url;
     audio.src = url;
     audio.play().then(() => {
       isPlaying = true;
-      document.getElementById('playPauseBtn').innerText = '⏸';
+      document.getElementById('playPauseBtn').innerText = '⏸️';
     }).catch(e => console.log("Playback failed:", e));
   }
 
@@ -486,10 +655,10 @@ HTML_PAGE = """
     if (!audio.src) return;
     if (isPlaying) {
       audio.pause();
-      document.getElementById('playPauseBtn').innerText = '▶';
+      document.getElementById('playPauseBtn').innerText = '▶️';
     } else {
       audio.play();
-      document.getElementById('playPauseBtn').innerText = '⏸';
+      document.getElementById('playPauseBtn').innerText = '⏸️';
     }
     isPlaying = !isPlaying;
   }
@@ -497,16 +666,21 @@ HTML_PAGE = """
   function playNext() {
     if(!currentSong) return;
     const idx = queue.findIndex(q => q.id === currentSong.id);
-    if (idx > -1 && idx < queue.length - 1) playFromQueue(idx + 1);
+    if (idx > -1 && idx < queue.length - 1) playQueueIndex(idx + 1);
   }
 
   function playPrev() {
     if(!currentSong) return;
     const idx = queue.findIndex(q => q.id === currentSong.id);
-    if (idx > 0) playFromQueue(idx - 1);
+    if (idx > 0) playQueueIndex(idx - 1);
   }
 
-  // --- AUDIO EVENTS ---
+  function updatePlayerFavIcon() {
+    if(!currentSong) return;
+    const isFav = favorites.some(f => f.id === currentSong.id);
+    document.getElementById('playerFavBtn').innerText = isFav ? '❤️' : '🤍';
+  }
+
   audio.addEventListener('timeupdate', () => {
     const curr = audio.currentTime;
     const dur = audio.duration || 0;
@@ -532,6 +706,7 @@ HTML_PAGE = """
     const s = Math.floor(seconds % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   }
+
 </script>
 </body>
 </html>
