@@ -1,0 +1,11 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "music-api-8.onrender",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "music-api-8.onrender",
+  "start_url": "/",
+  "theme_color": "#000000"
+}
